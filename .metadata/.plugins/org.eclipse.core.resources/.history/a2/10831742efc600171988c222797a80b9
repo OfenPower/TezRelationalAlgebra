@@ -1,0 +1,43 @@
+package de.bachd.bigdata;
+
+import java.io.DataInput;
+import java.io.DataOutput;
+import java.io.IOException;
+
+import org.apache.hadoop.io.ArrayWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.io.WritableComparable;
+
+public class Tuple implements WritableComparable<Tuple> {
+
+	private ArrayWritable values;
+
+	public Tuple() {
+		values = new ArrayWritable(Text.class);
+	}
+
+	public void addValues(Text[] values) {
+		this.values.set(values.toArray(new Text[]));
+	}
+
+	public Text[] getValues() {
+		return (Text[]) this.values.get();
+	}
+
+	@Override
+	public void readFields(DataInput in) throws IOException {
+		values.readFields(in);
+	}
+
+	@Override
+	public void write(DataOutput out) throws IOException {
+		values.write(out);
+	}
+
+	@Override
+	public int compareTo(Tuple obj) {
+		// TODO Auto-generated method stub
+		return 0;
+	}
+
+}

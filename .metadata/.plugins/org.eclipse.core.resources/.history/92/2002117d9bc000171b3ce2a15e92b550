@@ -1,0 +1,17 @@
+package de.bachd.bigdata;
+
+import org.apache.tez.runtime.api.ProcessorContext;
+import org.apache.tez.runtime.library.processor.SimpleProcessor;
+
+public class TableProcessor extends SimpleProcessor {
+
+	public TableProcessor(ProcessorContext context) {
+		super(context);
+	}
+
+	@Override
+	public void run() throws Exception {
+
+	}
+
+}

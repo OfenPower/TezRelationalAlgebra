@@ -1,0 +1,15 @@
+package de.bachd.bigdata;
+
+import java.util.function.Predicate;
+
+public class PredicateHolder {
+	private static Predicate<Tuple> predicate;
+
+	public static void setPredicate(Predicate<Tuple> p) {
+		predicate = p;
+	}
+
+	public static Predicate<Tuple> getPredicate() {
+		return predicate;
+	}
+}

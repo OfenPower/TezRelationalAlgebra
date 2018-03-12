@@ -1,0 +1,5 @@
+package de.bachd.bigdata.streams;
+
+public interface Predicator<T> {
+	public boolean test(T t);
+}

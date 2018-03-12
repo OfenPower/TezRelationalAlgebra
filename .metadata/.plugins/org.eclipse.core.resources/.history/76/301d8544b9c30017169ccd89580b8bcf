@@ -1,0 +1,35 @@
+package de.bachd.bigdata.streams;
+
+public abstract class Stream<T> {
+	// Vorgänger
+	protected Stream<T> stream;
+
+	public abstract T process();
+
+	public Stream(Stream<T> stream) {
+		this.stream = stream;
+	}
+
+	public Stream<T> filter(Predicater<T> pred) {
+		return new FilterStream<T>(this, pred);
+	}
+
+	public Stream<T> peek(Applier<T> mapper) {
+		return new PeekStream<T>(this, mapper);
+	}
+
+	public void forEach(Applier<T> cons) {
+		T t;
+		while ((t = process()) != null) {
+			cons.apply(t);
+		}
+	}
+
+	public int sum(IntegerMapper<T> mapper) {
+		int result = 0;
+		T t;
+		while ((t = process()) != null) {
+			result += mapper.map(t);
+		}
+	}
+}

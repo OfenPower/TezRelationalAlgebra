@@ -1,0 +1,154 @@
+package de.bachd.bigdata;
+
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Deque;
+import java.util.Iterator;
+import java.util.List;
+import java.util.function.Predicate;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.io.NullWritable;
+import org.apache.tez.common.TezUtils;
+import org.apache.tez.dag.api.UserPayload;
+import org.apache.tez.runtime.api.ProcessorContext;
+import org.apache.tez.runtime.library.api.KeyValueReader;
+import org.apache.tez.runtime.library.api.KeyValueWriter;
+import org.apache.tez.runtime.library.processor.SimpleProcessor;
+
+import com.google.common.base.CharMatcher;
+import com.google.common.base.Preconditions;
+import com.google.common.base.Splitter;
+
+public class SelectionProcessor extends SimpleProcessor {
+
+	private Predicate<Tuple> p;
+
+	public SelectionProcessor(ProcessorContext context) {
+		super(context);
+	}
+
+	@Override
+	public void run() throws Exception {
+		Preconditions.checkState(getInputs().size() == 1);
+		Preconditions.checkState(getOutputs().size() == 1);
+
+		KeyValueReader kvReader = (KeyValueReader) getInputs().values().iterator().next().getReader();
+		KeyValueWriter kvWriter = (KeyValueWriter) getOutputs().values().iterator().next().getWriter();
+		while (kvReader.next()) {
+			Tuple tuple = (Tuple) kvReader.getCurrentKey();
+			NullWritable nullValue = NullWritable.get();
+			// Tuple nach Prädikat selektieren und an Projektionsprozessor
+			// weiterreichen
+			if (p.test(tuple)) {
+				PrintSelectedTuple(tuple);
+				kvWriter.write(tuple, nullValue);
+			}
+		}
+	}
+
+	@Override
+	public void initialize() throws Exception {
+		System.out.println("Initialize SelectionProcessor");
+
+		// UserPayload in Configuration konvertieren und Predicates bauen
+		UserPayload up = getContext().getUserPayload();
+		Configuration conf = TezUtils.createConfFromUserPayload(up);
+		String predicate = conf.get("Predicate");
+		Iterable<String> predIterable = Splitter.on(CharMatcher.anyOf(" and ").and(CharMatcher.anyOf(" or ")))
+				.trimResults().omitEmptyStrings().split(predicate);
+		// Reihenfolge der Bool-Operatoren speichern und Parameter der Form
+		// (AttributName Relation Datentyp) in predicateParameters speichern
+		Deque<String> predicateParameters = new ArrayDeque<>();
+		Deque<String> boolOperators = new ArrayDeque<>();
+		for (String s : predIterable) {
+			if (s.equals("and") || s.equals("or")) {
+				boolOperators.addLast(s);
+			} else {
+				predicateParameters.addLast(s);
+			}
+		}
+
+		// BoolOperators ausgeben
+		for (String s : boolOperators) {
+			System.out.println(s);
+		}
+
+		// Über predicateParameter iterieren und einzelne Predicates bauen
+		List<Predicate<Tuple>> predList = new ArrayList<>();
+		Iterator<String> predItr = predicateParameters.iterator();
+		while (predItr.hasNext()) {
+			String attributeName = predItr.next();
+			String relation = predItr.next();
+			String value = predItr.next();
+			Predicate<Tuple> p = buildPredicate(attributeName, relation, value);
+			predList.add(p);
+			System.out.println(attributeName + " " + relation + " " + value);
+		}
+		System.out.println("Selektion nach: " + predicate);
+
+		// Prädikate mit logischen Operatoren kombinieren
+		for (String op : boolOperators) {
+			if (op.equals("and")) {
+
+			}
+		}
+		for (Predicate<Tuple> p : predList) {
+			String boolOp = boolOperators.pollFirst();
+			if(boolOp.equals("and")) {
+				
+			}
+		}
+
+		/**
+		 * ToDo: Prädikat aus String aufbauen!
+		 */
+		Predicate<Tuple> p1 = t -> t.getColumnValueCompMap().get("ArtNr").greaterEqualThan("1004");
+		Predicate<Tuple> p2 = t -> t.getColumnValueCompMap().get("ArtNr").equal("1001");
+		Predicate<Tuple> p3 = t -> t.getColumnValueCompMap().get("ArtPreis").equal("19.99");
+		Predicate<Tuple> p4 = t -> t.getColumnValueCompMap().get("ArtPreis").greaterEqualThan("40.00");
+		p = p3.or(p4);
+	}
+
+	private static void PrintSelectedTuple(Tuple tuple) {
+		List<String> l = tuple.getAttributeValues();
+		for (String t1 : l) {
+			System.out.print(t1 + "\t");
+		}
+		System.out.println();
+	}
+
+	// Prädikat abhängig der Operation "relation" zusammenbauen und zurückgeben
+	private Predicate<Tuple> buildPredicate(String attributeName, String relation, String value) {
+		Predicate<Tuple> p = null;
+		switch (relation) {
+		case "=": {
+			p = t -> t.getColumnValueCompMap().get(attributeName).equal(value);
+			break;
+		}
+		case "!=": {
+			p = t -> t.getColumnValueCompMap().get(attributeName).notEqual(value);
+			break;
+		}
+		case "<": {
+			p = t -> t.getColumnValueCompMap().get(attributeName).lessThan(value);
+			break;
+		}
+		case "<=": {
+			p = t -> t.getColumnValueCompMap().get(attributeName).lessEqualThan(value);
+			break;
+		}
+		case ">": {
+			p = t -> t.getColumnValueCompMap().get(attributeName).greaterThan(value);
+			break;
+		}
+		case ">=": {
+			p = t -> t.getColumnValueCompMap().get(attributeName).greaterEqualThan(value);
+			break;
+		}
+		}
+
+		return p;
+	}
+
+}

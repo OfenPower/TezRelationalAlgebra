@@ -1,0 +1,32 @@
+package de.bachd.bigdata;
+
+import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.tez.mapreduce.processor.SimpleMRProcessor;
+import org.apache.tez.runtime.api.ProcessorContext;
+import org.apache.tez.runtime.library.api.KeyValueReader;
+import org.apache.tez.runtime.library.api.KeyValueWriter;
+
+public class TableProcessor extends SimpleMRProcessor {
+
+	private static final String DATAINPUT = "DataInput";
+	private static final String SCHEMEINPUT = "SchemeInput";
+	private static final String OUTPUT = "Output";
+
+	public TableProcessor(ProcessorContext context) {
+		super(context);
+	}
+
+	@Override
+	public void run() throws Exception {
+		KeyValueReader kvReader = (KeyValueReader) getInputs().get(DATAINPUT).getReader();
+		KeyValueWriter kvWriter = (KeyValueWriter) getOutputs().get(OUTPUT).getWriter();
+		while (kvReader.next()) {
+			System.out.println("DataProcessor -> next");
+			IntWritable key = new IntWritable(0);
+			Text row = new Text(kvReader.getCurrentValue().toString());
+			kvWriter.write(key, row);
+		}
+	}
+
+}

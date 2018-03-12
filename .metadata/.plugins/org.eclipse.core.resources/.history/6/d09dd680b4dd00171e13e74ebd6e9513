@@ -1,0 +1,60 @@
+package de.bachd.bigdata.tez;
+
+import java.util.HashMap;
+import java.util.Map;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.io.Text;
+import org.apache.tez.common.TezUtils;
+import org.apache.tez.dag.api.UserPayload;
+import org.apache.tez.runtime.api.ProcessorContext;
+import org.apache.tez.runtime.library.api.KeyValueWriter;
+import org.apache.tez.runtime.library.api.KeyValuesReader;
+import org.apache.tez.runtime.library.processor.SimpleProcessor;
+
+import de.bachd.bigdata.aggregate.CountAggregate;
+
+public class AggregateProjectionProcessor extends SimpleProcessor {
+
+	private Map<String, String> aggregateFunctionAttributeMap;
+
+	public AggregateProjectionProcessor(ProcessorContext context) {
+		super(context);
+		this.aggregateFunctionAttributeMap = new HashMap<>();
+	}
+
+	@Override
+	public void run() throws Exception {
+		KeyValuesReader kvsReader = (KeyValuesReader) getInputs().values().iterator().next().getReader();
+		KeyValueWriter kvWriter = (KeyValueWriter) getOutputs().values().iterator().next().getWriter();
+		while (kvsReader.next()) {
+			Text key = (Text) kvsReader.getCurrentKey();
+			CountAggregate agg = new CountAggregate().getNeutralElement();
+			for (Object obj : kvsReader.getCurrentValues()) {
+				Tuple t = (Tuple) obj;
+				agg.add(new CountAggregate());
+			}
+			System.out.println(key + "  count: " + agg.getValue());
+		}
+
+		// Neue Tupel erzeugen, welche als AttributeName den Ausdruck
+		// "aggFunction(attributeName)" erhalten! Diese Tupel dann an den
+		// ProjectionProcessor weiterleiten!
+
+	}
+
+	@Override
+	public void initialize() throws Exception {
+		System.out.println("Initialize AggregateProjectionProcessor");
+		UserPayload up = getContext().getUserPayload();
+		Configuration conf = TezUtils.createConfFromUserPayload(up);
+		String aggregateFunctions = conf.get("AggregateFunctions");
+		System.out.println("Aggregate-Functions: " + aggregateFunctions);
+
+		// Aggregatfunktionen in Map eintragen:
+		// key = Aggregatfunktion, value = Attribut welches mit dieser
+		// Aggregatfunktion aggregiert wird
+		this.aggregateFunctionAttributeMap.put("sum", "liegen.Bestand");
+	}
+
+}

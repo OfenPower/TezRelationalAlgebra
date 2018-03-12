@@ -1,0 +1,13 @@
+package de.bachd.bigdata;
+
+import org.apache.tez.runtime.api.ProcessorContext;
+import org.apache.tez.runtime.library.processor.SimpleProcessor;
+
+public class HashJoinProcessor extends SimpleProcessor {
+
+	public HashJoinProcessor(ProcessorContext context) {
+		super(context);
+		// TODO Auto-generated constructor stub
+	}
+
+}

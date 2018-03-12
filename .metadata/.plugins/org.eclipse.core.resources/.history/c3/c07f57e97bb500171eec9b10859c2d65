@@ -1,0 +1,70 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>de.bachd.bigdata</groupId>
+  <artifactId>RelationalTez</artifactId>
+  <version>1.0</version>
+  <packaging>jar</packaging>
+
+  <name>RelationalTez</name>
+  <url>http://maven.apache.org</url>
+
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+  </properties>
+  
+  <build>
+  	<plugins>
+    <plugin>
+      <!-- Build an executable JAR -->
+      <groupId>de.bachd.bigdata</groupId>
+      <artifactId>RelationalTez</artifactId>
+      <version>1.0</version>
+      <configuration>
+        <archive>
+          <manifest>
+            <addClasspath>true</addClasspath>
+            <classpathPrefix>lib/</classpathPrefix>
+            <mainClass>com.mypackage.MyClass</mainClass>
+          </manifest>
+        </archive>
+      </configuration>
+    </plugin>
+  	</plugins>
+  </build>
+  
+	
+  <dependencies>
+    <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+      <version>3.8.1</version>
+      <scope>test</scope>
+    </dependency>
+    <!-- https://mvnrepository.com/artifact/org.apache.tez/tez-api -->
+	<dependency>
+    	<groupId>org.apache.tez</groupId>
+    	<artifactId>tez-api</artifactId>
+    	<version>0.9.0</version>
+	</dependency>
+	<!-- https://mvnrepository.com/artifact/org.apache.tez/tez-runtime-library -->
+	<dependency>
+    	<groupId>org.apache.tez</groupId>
+    	<artifactId>tez-runtime-library</artifactId>
+    	<version>0.9.0</version>
+	</dependency>
+	<!-- https://mvnrepository.com/artifact/org.apache.tez/tez-mapreduce -->
+	<dependency>
+    	<groupId>org.apache.tez</groupId>
+    	<artifactId>tez-mapreduce</artifactId>
+    	<version>0.9.0</version>
+	</dependency>
+	<!-- https://mvnrepository.com/artifact/commons-io/commons-io -->
+	<dependency>
+ 	   <groupId>commons-io</groupId>
+  	  <artifactId>commons-io</artifactId>
+  	  <version>2.5</version>
+	</dependency>
+  </dependencies>
+</project>

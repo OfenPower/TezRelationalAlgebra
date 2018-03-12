@@ -1,0 +1,184 @@
+package de.bachd.bigdata;
+
+import java.io.DataInput;
+import java.io.DataOutput;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.hadoop.io.WritableComparable;
+
+/**
+ * ToDo: Eventuell Attribut mitführen, mit welchen Relationen das Tupel gejoined
+ * wurde!
+ */
+
+public class Tuple implements WritableComparable<Tuple> {
+
+	// private List<String> testList;
+	private List<String> relationNames;
+	private List<String> attributeNames;
+	private List<String> attributeDomains;
+	private List<String> attributeValues;
+
+	public Tuple() {
+		this.relationNames = new ArrayList<>();
+		this.attributeNames = new ArrayList<>();
+		this.attributeDomains = new ArrayList<>();
+		this.attributeValues = new ArrayList<>();
+	}
+
+	public static Tuple copyTuple(Tuple tuple) {
+		List<String> relations = tuple.getRelationNames();
+		List<String> names = tuple.getAttributeNames();
+		List<String> domains = tuple.getAttributeDomains();
+		List<String> values = tuple.getAttributeValues();
+		Tuple t = new Tuple();
+		t.set(relations, names, domains, values);
+		return t;
+	}
+
+	public void set(List<String> relations, List<String> names, List<String> domains, List<String> values) {
+		this.relationNames = relations;
+		this.attributeNames = names;
+		this.attributeDomains = domains;
+		this.attributeValues = values;
+	}
+
+	public List<String> getRelationNames() {
+		return this.relationNames;
+	}
+
+	public List<String> getAttributeNames() {
+		return this.attributeNames;
+	}
+
+	public List<String> getAttributeDomains() {
+		return this.attributeDomains;
+	}
+
+	public List<String> getAttributeValues() {
+		return this.attributeValues;
+	}
+
+	public Map<String, String> getColumnStringMap() {
+		List<String> columns = this.attributeNames;
+		List<String> values = this.attributeValues;
+		Map<String, String> map = new HashMap<>();
+		for (int i = 0; i < columns.size(); i++) {
+			map.put(columns.get(i), values.get(i));
+		}
+		return map;
+	}
+
+	public Map<String, PredicateComparable> getColumnComparableMap() {
+		List<String> columns = this.attributeNames;
+		List<String> domains = this.attributeDomains;
+		List<String> values = this.attributeValues;
+		Map<String, PredicateComparable> map = new HashMap<>();
+		for (int i = 0; i < columns.size(); i++) {
+			String value = values.get(i);
+			if (domains.get(i).equals("Integer")) {
+				IntegerComparable ic = new IntegerComparable(Integer.parseInt(value));
+				map.put(columns.get(i), ic);
+			} else if (domains.get(i).equals("String")) {
+				StringComparable sc = new StringComparable(value);
+				map.put(columns.get(i), sc);
+			} else if (domains.get(i).equals("Double")) {
+				DoubleComparable dc = new DoubleComparable(Double.parseDouble(value));
+				map.put(columns.get(i), dc);
+			}
+		}
+		return map;
+	}
+
+	public void printColumnValues() {
+		List<String> names = this.getAttributeNames();
+		List<String> values = this.getAttributeValues();
+		for (int i = 0; i < names.size(); i++) {
+			System.out.print(names.get(i) + "\t");
+		}
+		System.out.println();
+		for (int i = 0; i < values.size(); i++) {
+			System.out.print(values.get(i) + "\t");
+		}
+		System.out.println();
+	}
+
+	@Override
+	public void readFields(DataInput in) throws IOException {
+		// Listen deserialisieren
+		// ----------------------
+		// RelationNames
+		int relationSize = in.readInt();
+		this.relationNames = new ArrayList<>();
+		for (int i = 0; i < relationSize; i++) {
+			String s = in.readUTF();
+			this.relationNames.add(s);
+		}
+		// AttributeNames
+		int nameSize = in.readInt();
+		this.attributeNames = new ArrayList<>();
+		for (int i = 0; i < nameSize; i++) {
+			String s = in.readUTF();
+			this.attributeNames.add(s);
+		}
+		// AttributeDomains
+		int domainSize = in.readInt();
+		this.attributeDomains = new ArrayList<>();
+		for (int i = 0; i < domainSize; i++) {
+			String s = in.readUTF();
+			this.attributeDomains.add(s);
+		}
+		// AttributeValues
+		int valueSize = in.readInt();
+		this.attributeValues = new ArrayList<>();
+		for (int i = 0; i < valueSize; i++) {
+			String s = in.readUTF();
+			this.attributeValues.add(s);
+		}
+	}
+
+	@Override
+	public void write(DataOutput out) throws IOException {
+		// Listen serialisieren
+		// --------------------
+		// RelationNames
+		out.writeInt(this.relationNames.size());
+		for (int i = 0; i < this.relationNames.size(); i++) {
+			out.writeUTF(this.relationNames.get(i));
+		}
+		// AttributeNames
+		out.writeInt(this.attributeNames.size());
+		for (int i = 0; i < this.attributeNames.size(); i++) {
+			out.writeUTF(this.attributeNames.get(i));
+		}
+		// AttributeDomains
+		out.writeInt(this.attributeDomains.size());
+		for (int i = 0; i < this.attributeDomains.size(); i++) {
+			out.writeUTF(this.attributeDomains.get(i));
+		}
+		// AttributeValues
+		out.writeInt(this.attributeValues.size());
+		for (int i = 0; i < this.attributeValues.size(); i++) {
+			out.writeUTF(this.attributeValues.get(i));
+		}
+	}
+
+	@Override
+	public int compareTo(Tuple obj) {
+		if (this.hashCode() < obj.hashCode()) {
+			return -1;
+		} else {
+			return 1;
+		}
+	}
+
+	@Override
+	public int hashCode() {
+		return this.attributeValues.hashCode();
+	}
+
+}

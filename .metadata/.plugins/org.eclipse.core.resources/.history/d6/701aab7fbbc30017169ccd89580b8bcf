@@ -1,0 +1,45 @@
+package de.bachd.bigdata.streams;
+
+public class MyList<T> {
+	private int size;
+	private T[] data;
+
+	@SuppressWarnings("unchecked")
+	public MyList(int initialCapacity) {
+		this.size = 0;
+		data = (T[]) new Object[initialCapacity];
+	}
+
+	public MyList() {
+		this(10);
+	}
+
+	@SuppressWarnings("unchecked")
+	public void add(T o) {
+		if (o == null) {
+			return;
+		}
+		// Arraygröße verdoppeln, falls kein Platz mehr
+		if (size == data.length) {
+			T[] newData = (T[]) new Object[2 * data.length];
+			for (int i = 0; i < data.length; i++) {
+				newData[i] = data[i];
+			}
+			this.data = newData;
+		}
+		data[size++] = o;
+	}
+
+	public int size() {
+		return size;
+	}
+
+	public T get(int index) {
+		return data[index];
+	}
+
+	// !!!!!!!!!!!
+	public Stream<T> stream() {
+		return new InitialStream<T>(this);
+	}
+}

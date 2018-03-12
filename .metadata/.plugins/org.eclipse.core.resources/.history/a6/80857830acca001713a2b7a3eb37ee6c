@@ -1,0 +1,7 @@
+package de.bachd.bigdata;
+
+import org.apache.tez.mapreduce.processor.SimpleMRProcessor;
+
+public class ProjectionProcessor extends SimpleMRProcessor {
+
+}

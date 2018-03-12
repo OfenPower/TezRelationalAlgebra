@@ -1,0 +1,15 @@
+package de.bachd.bigdata;
+
+public class QueryNode {
+
+	private String query;
+
+	public QueryNode(String name) {
+		this.query = name;
+	}
+
+	public String getQuery() {
+		return query;
+	}
+
+}

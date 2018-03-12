@@ -1,0 +1,25 @@
+package de.bachd.bigdata;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.tez.dag.api.TezConfiguration;
+import org.apache.tez.runtime.api.AbstractLogicalIOProcessor;
+import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
+
+public class App {
+
+	public static class Processor extends AbstractLogicalIOProcessor {
+		
+	}
+	
+	
+	public static void main(String[] args) {
+		Configuration conf = new Configuration();
+		conf.setBoolean(TezConfiguration.TEZ_LOCAL_MODE, true);
+		conf.set("fs.default.name", "file:///");
+		conf.setBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH, true);
+		
+		System.out.println();
+		System.out.println("Hallo Welt");
+	}
+
+}

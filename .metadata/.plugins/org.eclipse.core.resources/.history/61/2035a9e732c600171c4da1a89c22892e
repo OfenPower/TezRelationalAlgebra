@@ -1,0 +1,73 @@
+package de.bachd.bigdata;
+
+import java.util.Iterator;
+
+import org.apache.hadoop.io.NullWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.tez.mapreduce.processor.SimpleMRProcessor;
+import org.apache.tez.runtime.api.LogicalInput;
+import org.apache.tez.runtime.api.ProcessorContext;
+import org.apache.tez.runtime.library.api.KeyValueReader;
+import org.apache.tez.runtime.library.api.KeyValueWriter;
+
+import com.google.common.base.Preconditions;
+
+/**
+ * TableProcessor hat 2 Inputs:
+ * 
+ * - Output von SchemeProcessor in der Form (null, column)
+ * 
+ * - Input der .csv Datei (Tupel der Tabelle)
+ */
+
+public class TableProcessor extends SimpleMRProcessor {
+
+	private static final String SCHEMEPROCESSOR = "SchemeProcessor";
+
+	public TableProcessor(ProcessorContext context) {
+		super(context);
+	}
+
+	/*
+	 * @Override public void preOp() throws Exception { super.preOp();
+	 * 
+	 * /* // Knoten blockieren, solange Schema noch nicht gelesen wurde
+	 * LogicalInput schemeInput = getInputs().get(App.V2); ArrayList<Input>
+	 * blockingInputs = new ArrayList<>(); blockingInputs.add(schemeInput);
+	 * getContext().waitForAllInputsReady(blockingInputs);
+	 *
+	 * }
+	 */
+
+	@Override
+	public void run() throws Exception {
+		Preconditions.checkState(getInputs().size() == 2);
+		Iterator<LogicalInput> kvReaderItr = getInputs().values().iterator();
+		KeyValueReader kvSchemeReader = null;
+		KeyValueReader kvDataReader = null;
+		KeyValueWriter kvTableWriter = (KeyValueWriter) getOutputs().values().iterator().next().getWriter();
+		while (kvReaderItr.hasNext()) {
+			if (getInputs().containsKey(SCHEMEPROCESSOR)) {
+				kvSchemeReader = (KeyValueReader) kvReaderItr.next().getReader();
+			} else {
+				kvDataReader = (KeyValueReader) kvReaderItr.next().getReader();
+			}
+		}
+		// Columns lesen
+		while (kvSchemeReader.next()) {
+			Column col = (Column) kvSchemeReader.getCurrentKey();
+			System.out.println(col.toString());
+		}
+
+		System.out.println("run()");
+		NullWritable nullValue = NullWritable.get();
+		Text t = new Text("1001\tHose\t19.99");
+		kvTableWriter.write(t, nullValue);
+
+	}
+
+	@Override
+	public void initialize() throws Exception {
+		System.out.println("Initialize TableProcessor");
+	}
+}

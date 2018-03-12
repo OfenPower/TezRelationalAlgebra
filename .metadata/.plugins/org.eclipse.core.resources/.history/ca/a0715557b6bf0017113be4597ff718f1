@@ -1,0 +1,155 @@
+package de.bachd.bigdata;
+
+import java.io.IOException;
+import java.util.Set;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.conf.Configured;
+import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
+import org.apache.hadoop.util.Tool;
+import org.apache.hadoop.util.ToolRunner;
+import org.apache.tez.client.TezClient;
+import org.apache.tez.dag.api.DAG;
+import org.apache.tez.dag.api.DataSinkDescriptor;
+import org.apache.tez.dag.api.DataSourceDescriptor;
+import org.apache.tez.dag.api.Edge;
+import org.apache.tez.dag.api.ProcessorDescriptor;
+import org.apache.tez.dag.api.TezConfiguration;
+import org.apache.tez.dag.api.TezException;
+import org.apache.tez.dag.api.Vertex;
+import org.apache.tez.dag.api.client.DAGClient;
+import org.apache.tez.dag.api.client.DAGStatus;
+import org.apache.tez.dag.api.client.StatusGetOpts;
+import org.apache.tez.mapreduce.input.MRInput;
+import org.apache.tez.mapreduce.output.MROutput;
+import org.apache.tez.runtime.api.ProcessorContext;
+import org.apache.tez.runtime.library.api.KeyValueReader;
+import org.apache.tez.runtime.library.api.KeyValueWriter;
+import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
+import org.apache.tez.runtime.library.conf.UnorderedKVEdgeConfig;
+import org.apache.tez.runtime.library.processor.SimpleProcessor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.google.common.collect.Sets;
+
+/**
+ * Hello World!
+ *
+ */
+public class AppTest extends Configured implements Tool {
+
+	static String INPUT = "Input";
+	static String OUTPUT = "Output";
+	static String V1 = "v1";
+	static String V2 = "v2";
+	private static final Logger LOG = LoggerFactory.getLogger(AppTest.class);
+
+	public static class DataProcessor extends SimpleProcessor {
+
+		public DataProcessor(ProcessorContext context) {
+			super(context);
+		}
+
+		@Override
+		public void run() throws Exception {
+			KeyValueReader kvReader = (KeyValueReader) getInputs().get(INPUT).getReader();
+			KeyValueWriter kvWriter = (KeyValueWriter) getOutputs().get(V2).getWriter();
+			while (kvReader.next()) {
+				System.out.println("DataProcessor -> next");
+				IntWritable key = new IntWritable(555);
+				Text row = new Text(kvReader.getCurrentValue().toString());
+				kvWriter.write(key, row);
+			}
+
+			// Output ans Filesystem committen
+			// MROutput mrOutput = (MROutput) getOutputs().get(OUTPUT);
+			// mrOutput.commit();
+		}
+	}
+
+	public static class SchemeProcessor extends SimpleProcessor {
+
+		public SchemeProcessor(ProcessorContext context) {
+			super(context);
+		}
+
+		@Override
+		public void run() throws Exception {
+			KeyValueReader kvReader = (KeyValueReader) getInputs().get(V1).getReader();
+			KeyValueWriter kvWriter = (KeyValueWriter) getOutputs().get(OUTPUT).getWriter();
+			while (kvReader.next()) {
+				System.out.println("SchemeProcessor -> next");
+				IntWritable key = (IntWritable) kvReader.getCurrentKey();
+				Text row = new Text(kvReader.getCurrentValue().toString());
+				kvWriter.write(key, row);
+			}
+
+			// Output ans Filesystem committen
+			MROutput mrOutput = (MROutput) getOutputs().get(OUTPUT);
+			mrOutput.commit();
+		}
+
+	}
+
+	@Override
+	public int run(String[] args) throws Exception {
+		// Tez lokal aufsetzen
+		TezConfiguration tezConf = new TezConfiguration(getConf());
+		tezConf.setBoolean(TezConfiguration.TEZ_LOCAL_MODE, true);
+		tezConf.set("fs.default.name", "file:///");
+		tezConf.setBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH, true);
+
+		// TezClient starten
+		TezClient tezClient = TezClient.create("TezClient", tezConf);
+		tezClient.start();
+
+		return runJob(args, tezConf, tezClient);
+	}
+
+	private int runJob(String[] args, TezConfiguration tezConf, TezClient tezClient) throws TezException, IOException {
+		// Datasource
+		DataSourceDescriptor dataSource1 = MRInput
+				.createConfigBuilder(new Configuration(tezConf), TextInputFormat.class, "artikel.csv").build();
+		DataSourceDescriptor dataSource2 = MRInput
+				.createConfigBuilder(new Configuration(tezConf), TextInputFormat.class, "artikel.scheme").build();
+		DataSinkDescriptor dataSink1 = MROutput
+				.createConfigBuilder(new Configuration(tezConf), TextOutputFormat.class, "output.csv").build();
+
+		// Knoten erzeugen
+		Vertex v1 = Vertex.create(V1, ProcessorDescriptor.create(DataProcessor.class.getName()));
+		v1.addDataSource(INPUT, dataSource1);
+		// v1.addDataSink(OUTPUT, dataSink1);
+		Vertex v2 = Vertex.create(V2, ProcessorDescriptor.create(SchemeProcessor.class.getName()), 1);
+		v2.addDataSink(OUTPUT, dataSink1);
+
+		// Edge erzeugen
+		UnorderedKVEdgeConfig e = UnorderedKVEdgeConfig.newBuilder(IntWritable.class.getName(), Text.class.getName())
+				.setFromConfiguration(tezConf).build();
+		Edge e1 = Edge.create(v1, v2, e.createDefaultBroadcastEdgeProperty());
+
+		// Graph erzeugen
+		DAG dag = DAG.create("dag");
+		dag.addVertex(v1).addVertex(v2).addEdge(e1);
+		DAGClient dagClient = tezClient.submitDAG(dag);
+		Set<StatusGetOpts> getOpts = Sets.newHashSet();
+		getOpts.add(StatusGetOpts.GET_COUNTERS);
+		try {
+			DAGStatus dagStatus;
+			dagStatus = dagClient.waitForCompletionWithStatusUpdates(getOpts);
+			System.out.println("DAG diagnostics: " + dagStatus.getDiagnostics());
+		} catch (InterruptedException e2) {
+			System.out.println("Error");
+			e2.printStackTrace();
+		}
+
+		return 0;
+	}
+
+	public static void main(String[] args) throws Exception {
+		ToolRunner.run(new Configuration(), new AppTest(), args);
+	}
+}

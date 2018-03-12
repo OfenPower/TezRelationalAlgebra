@@ -1,0 +1,5 @@
+package de.bachd.bigdata.tez;
+
+public class ProcessorTest extends AbstractLogicalIOProcessor {
+
+}

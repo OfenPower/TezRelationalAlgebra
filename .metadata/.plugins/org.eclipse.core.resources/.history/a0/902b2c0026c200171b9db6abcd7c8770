@@ -1,0 +1,7 @@
+package de.bachd.bigdata;
+
+import org.apache.tez.runtime.library.input.UnorderedKVInput;
+
+public class CustomInput extends UnorderedKVInput {
+
+}

@@ -1,0 +1,7 @@
+package de.bachd.bigdata.streams;
+
+public class Main {
+	public static void main(String[] args) {
+		MyList<Integer> list1 = new MyList<>();
+	}
+}

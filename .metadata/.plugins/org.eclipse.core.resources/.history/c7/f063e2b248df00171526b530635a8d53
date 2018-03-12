@@ -1,0 +1,75 @@
+package de.bachd.bigdata.tez;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.io.Text;
+import org.apache.tez.common.TezUtils;
+import org.apache.tez.dag.api.UserPayload;
+import org.apache.tez.runtime.api.ProcessorContext;
+import org.apache.tez.runtime.library.api.KeyValueWriter;
+import org.apache.tez.runtime.library.api.KeyValuesReader;
+import org.apache.tez.runtime.library.processor.SimpleProcessor;
+
+import de.bachd.bigdata.aggregate2.AggregationStrategy;
+import de.bachd.bigdata.aggregate2.SumStrategy;
+import de.bachd.bigdata.utils.Pair;
+
+public class AggregationProcessor extends SimpleProcessor {
+
+	private List<Pair<AggregationStrategy, String>> aggregateFunctions;
+
+	public AggregationProcessor(ProcessorContext context) {
+		super(context);
+		aggregateFunctions = new ArrayList<>();
+	}
+
+	@Override
+	public void run() throws Exception {
+		KeyValuesReader kvsReader = (KeyValuesReader) getInputs().values().iterator().next().getReader();
+		KeyValueWriter kvWriter = (KeyValueWriter) getOutputs().values().iterator().next().getWriter();
+		while (kvsReader.next()) {
+			Text key = (Text) kvsReader.getCurrentKey();
+
+			// -------------------
+			Pair<AggregationStrategy, String> p = aggregateFunctions.get(0);
+			AggregationStrategy aggregate = p.getLeft();
+			aggregate.setNeutral();
+			for (Object obj : kvsReader.getCurrentValues()) {
+				Tuple t = (Tuple) obj;
+				Map<String, String> valueMap2 = t.getColumnStringMap();
+				aggregate.add(valueMap2.get("liegen.Bestand"));
+			}
+			System.out.println(key + "  sum: " + aggregate.getValue());
+
+			// -------------------
+		}
+
+		// ToDo!!!!
+		// ------------------
+		// Neue Tupel erzeugen, welche als AttributeName den Ausdruck
+		// "aggFunction(attributeName)" erhalten! Diese Tupel dann an den
+		// ProjectionProcessor weiterleiten!
+
+	}
+
+	@Override
+	public void initialize() throws Exception {
+		System.out.println("Initialize AggregationProcessor");
+		UserPayload up = getContext().getUserPayload();
+		Configuration conf = TezUtils.createConfFromUserPayload(up);
+		String aggregateFunctions = conf.get("AggregateFunctions");
+		System.out.println("Aggregate-Functions: " + aggregateFunctions);
+
+		// Pair erzeugen: Left = aggregateFunction, Right = Attribut welches
+		// aggregiert werden soll
+		SumStrategy cs = new SumStrategy();
+		// CountStrategy cs = new CountStrategy();
+		// AverageStrategy cs = new AverageStrategy();
+		Pair<AggregationStrategy, String> pair = new Pair<>(cs, "liegen.Bestand");
+		this.aggregateFunctions.add(pair);
+	}
+
+}

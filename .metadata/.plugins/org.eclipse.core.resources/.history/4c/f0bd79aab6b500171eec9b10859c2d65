@@ -1,0 +1,23 @@
+package de.bachd.bigdata;
+
+import java.util.ArrayList;
+
+public class QueryNode {
+
+	private String query;
+
+	public QueryNode(String name) {
+		this.query = name;
+		successorNodes = new ArrayList<>();
+	}
+
+	public QueryNode appendNode(QueryNode node) {
+		successorNodes.add(node);
+		return this;
+	}
+
+	public String getQuery() {
+		return query;
+	}
+
+}

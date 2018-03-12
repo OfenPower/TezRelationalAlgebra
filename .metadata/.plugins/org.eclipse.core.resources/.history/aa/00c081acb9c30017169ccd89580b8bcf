@@ -1,0 +1,23 @@
+package de.bachd.bigdata.streams;
+
+public class InitialStream<T> extends Stream<T> {
+
+	private MyList<T> list;
+	private int index;
+
+	public InitialStream(MyList<T> list) {
+		super(null); // stream = null
+		this.list = list;
+	}
+
+	@Override
+	public T process() {
+
+		// Durchlaufe Listenelemente und gebe null am Ende zurück
+		if(index < list.size()) {
+			return list.get(index++);
+		}
+		return null;
+	}
+
+}

@@ -1,0 +1,15 @@
+package de.bachd.bigdata;
+
+public class App {
+
+	
+	
+	
+	public static void main(String[] args) {
+		Configuration conf = new Configuration();
+		conf.setBoolean(TezConfiguration.TEZ_LOCAL_MODE, true);
+		conf.set("fs.default.name", "file:///");
+		conf.setBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH, true);
+	}
+
+}

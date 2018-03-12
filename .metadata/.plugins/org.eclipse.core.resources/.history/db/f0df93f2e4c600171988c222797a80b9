@@ -1,0 +1,6 @@
+package de.bachd.bigdata;
+
+
+public class Tuple extends WritableComparator<Tuple> {
+
+}

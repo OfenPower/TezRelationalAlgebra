@@ -1,0 +1,143 @@
+package de.bachd.bigdata;
+
+import java.io.DataInput;
+import java.io.DataOutput;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.hadoop.io.ArrayWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.io.Writable;
+import org.apache.hadoop.io.WritableComparable;
+
+/**
+ * ToDo: Eventuell Attribut mitführen, mit welchen Relationen das Tupel gejoined
+ * wurde!
+ */
+
+public class Tuple implements WritableComparable<Tuple> {
+
+	private ArrayWritable relationNames;
+	private ArrayWritable attributeNames;
+	private ArrayWritable attributeDomains;
+	private ArrayWritable attributeValues;
+
+	public Tuple() {
+		this.relationNames = new ArrayWritable(Text.class);
+		this.attributeNames = new ArrayWritable(Text.class);
+		this.attributeDomains = new ArrayWritable(Text.class);
+		this.attributeValues = new ArrayWritable(Text.class);
+	}
+
+	public void setRelationNames(Text[] names) {
+		relationNames.set(names);
+	}
+
+	public void setElements(Text[] attributeNames, Text[] attributeDomains, Text[] attributeValues) {
+		this.attributeNames.set(attributeNames);
+		this.attributeDomains.set(attributeDomains);
+		this.attributeValues.set(attributeValues);
+	}
+
+	public List<String> getRelationNames() {
+		Writable[] w = this.relationNames.get();
+		ArrayList<String> l = new ArrayList<>();
+		for (int i = 0; i < w.length; i++) {
+			String s = ((Text) w[i]).toString();
+			l.add(s);
+		}
+		return l;
+	}
+
+	public List<String> getAttributeNames() {
+		// Text-Elemente einzeln casten, da von Writable[] nicht auf
+		// List<Text> gecastet werden kann
+		Writable[] w = this.attributeNames.get();
+		ArrayList<String> l = new ArrayList<>();
+		for (int i = 0; i < w.length; i++) {
+			String s = ((Text) w[i]).toString();
+			l.add(s);
+		}
+		return l;
+	}
+
+	public List<String> getAttributeDomains() {
+		// Text-Elemente einzeln casten, da von Writable[] nicht auf
+		// List<Text> gecastet werden kann
+		Writable[] w = this.attributeDomains.get();
+		ArrayList<String> l = new ArrayList<>();
+		for (int i = 0; i < w.length; i++) {
+			String s = ((Text) w[i]).toString();
+			l.add(s);
+		}
+		return l;
+	}
+
+	public List<String> getAttributeValues() {
+		// Text-Elemente einzeln casten, da von Writable[] nicht auf
+		// List<Text> gecastet werden kann
+		Writable[] w = this.attributeValues.get();
+		ArrayList<String> l = new ArrayList<>();
+		for (int i = 0; i < w.length; i++) {
+			String s = ((Text) w[i]).toString();
+			l.add(s);
+		}
+		return l;
+	}
+
+	public Map<String, String> getColumnValueStringMap() {
+		List<String> columns = getAttributeNames();
+		List<String> values = getAttributeValues();
+		Map<String, String> map = new HashMap<>();
+		for (int i = 0; i < columns.size(); i++) {
+			map.put(columns.get(i), values.get(i));
+		}
+		return map;
+	}
+
+	public Map<String, PredicateComparable> getColumnValueCompMap() {
+		List<String> columns = getAttributeNames();
+		List<String> domains = getAttributeDomains();
+		List<String> values = getAttributeValues();
+		Map<String, PredicateComparable> map = new HashMap<>();
+		for (int i = 0; i < columns.size(); i++) {
+			String value = values.get(i);
+			if (domains.get(i).equals("Integer")) {
+				IntegerComparable ic = new IntegerComparable(Integer.parseInt(value));
+				map.put(columns.get(i), ic);
+			} else if (domains.get(i).equals("String")) {
+				StringComparable sc = new StringComparable(value);
+				map.put(columns.get(i), sc);
+			} else if (domains.get(i).equals("Double")) {
+				DoubleComparable dc = new DoubleComparable(Double.parseDouble(value));
+				map.put(columns.get(i), dc);
+			}
+		}
+		return map;
+	}
+
+	@Override
+	public void readFields(DataInput in) throws IOException {
+		this.relationNames.readFields(in);
+		this.attributeNames.readFields(in);
+		this.attributeDomains.readFields(in);
+		this.attributeValues.readFields(in);
+	}
+
+	@Override
+	public void write(DataOutput out) throws IOException {
+		this.relationNames.write(out);
+		this.attributeNames.write(out);
+		this.attributeDomains.write(out);
+		this.attributeValues.write(out);
+	}
+
+	@Override
+	public int compareTo(Tuple obj) {
+		return 0;
+	}
+
+}

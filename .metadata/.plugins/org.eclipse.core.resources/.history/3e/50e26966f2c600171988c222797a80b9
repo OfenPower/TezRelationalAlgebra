@@ -1,0 +1,33 @@
+package de.bachd.bigdata;
+
+import org.apache.hadoop.io.NullWritable;
+import org.apache.tez.mapreduce.processor.SimpleMRProcessor;
+import org.apache.tez.runtime.api.ProcessorContext;
+import org.apache.tez.runtime.library.api.KeyValueReader;
+import org.apache.tez.runtime.library.api.KeyValueWriter;
+
+import com.google.common.base.Preconditions;
+
+public class ForwardingProcessor extends SimpleMRProcessor {
+
+	public ForwardingProcessor(ProcessorContext context) {
+		super(context);
+	}
+
+	@Override
+	public void run() throws Exception {
+		Preconditions.checkState(getInputs().size() == 1);
+		Preconditions.checkState(getOutputs().size() == 1);
+
+		KeyValueReader kvReader = (KeyValueReader) getInputs().values().iterator().next().getReader();
+		KeyValueWriter kvWriter = (KeyValueWriter) getOutputs().values().iterator().next().getWriter();
+		while (kvReader.next()) {
+			System.out.println("ForwardingProcessor -> next");
+			NullWritable nullKey = NullWritable.get();
+			Tuple t = (Tuple) kvReader.getCurrentValue();
+			kvWriter.write(nullKey, col);
+		}
+
+	}
+
+}

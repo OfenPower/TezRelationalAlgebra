@@ -1,0 +1,57 @@
+package de.bachd.bigdata;
+
+import java.util.List;
+
+import org.apache.hadoop.io.NullWritable;
+import org.apache.tez.mapreduce.processor.SimpleMRProcessor;
+import org.apache.tez.runtime.api.ProcessorContext;
+import org.apache.tez.runtime.library.api.KeyValueReader;
+import org.apache.tez.runtime.library.api.KeyValueWriter;
+
+import com.google.common.base.Preconditions;
+
+public class ProjectionProcessor extends SimpleMRProcessor {
+
+	private List<String> projectionList;
+
+	public ProjectionProcessor(ProcessorContext context) {
+		super(context);
+		projectionList = new ArrayList<>();
+	}
+
+	@Override
+	public void run() throws Exception {
+		Preconditions.checkState(getInputs().size() == 1);
+		Preconditions.checkState(getOutputs().size() == 1);
+		KeyValueReader kvReader = (KeyValueReader) getInputs().values().iterator().next().getReader();
+		KeyValueWriter kvWriter = (KeyValueWriter) getOutputs().values().iterator().next().getWriter();
+		while (kvReader.next()) {
+			Tuple tuple = (Tuple) kvReader.getCurrentKey();
+			List<String> attrList = tuple.getAttributeNames();
+
+			// SELECT * FROM
+			if (projectionList.contains("*")) {
+				// Alle Values rausschreiben
+				List<String> valueList = tuple.getAttributeValues();
+				NullWritable nullValue = NullWritable.get();
+				StringBuilder values = new StringBuilder("");
+				for (int i = 0; i < valueList.size(); i++) {
+					if (i != valueList.size() - 1) {
+						values.append(valueList.get(i)).append("\t");
+					} else {
+						values.append(valueList.get(i)).append("\n");
+					}
+				}
+				kvWriter.write(values, nullValue);
+			}
+
+		}
+
+	}
+
+	@Override
+	public void initialize() {
+		System.out.println("Initialize ProjectionProcessor");
+	}
+
+}

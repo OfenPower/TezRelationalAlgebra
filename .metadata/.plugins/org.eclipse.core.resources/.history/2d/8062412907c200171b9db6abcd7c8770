@@ -1,0 +1,34 @@
+package de.bachd.bigdata;
+
+import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.NullWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.tez.runtime.api.ProcessorContext;
+import org.apache.tez.runtime.library.api.KeyValueReader;
+import org.apache.tez.runtime.library.api.KeyValueWriter;
+import org.apache.tez.runtime.library.processor.SimpleProcessor;
+
+public class SchemeProcessor extends SimpleProcessor {
+
+	public SchemeProcessor(ProcessorContext context) {
+		super(context);
+	}
+
+	@Override
+	public void run() throws Exception {
+		KeyValueReader kvReader = (KeyValueReader) getInputs().get(App.SCHEMEINPUT).getReader();
+		KeyValueWriter kvWriter = (KeyValueWriter) getOutputs().get(App.V3).getWriter();
+		while (kvReader.next()) {
+			System.out.println("SchemeProcessor -> next");
+			NullWritable nullValue = NullWritable.get();
+			Text row = new Text(kvReader.getCurrentValue().toString());
+			kvWriter.write(key, row);
+		}
+
+		// Output ans Filesystem committen
+		// Kann weggelassen werden, wenn von SimpleMRProcessor geerbt wird!
+		// MROutput mrOutput = (MROutput) getOutputs().get(OUTPUT);
+		// mrOutput.commit();
+	}
+
+}

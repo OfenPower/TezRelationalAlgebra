@@ -1,0 +1,9 @@
+package de.bachd.bigdata.streams;
+
+public class InitialStream<T> extends Stream<T> {
+
+	public InitialStream(Stream<T> stream) {
+		super(stream);
+	}
+
+}

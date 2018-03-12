@@ -1,0 +1,20 @@
+package de.bachd.bigdata;
+
+/**
+ * Interface zur Anwendung von Vergleichsoperationen auf Tupelvalues. Die
+ * Vergleichswerte werden als String mitgegeben und in den jeweiligen
+ * implementierenden Klassen zu den jeweiligen Typen geparst (zB zu Integer).
+ */
+public interface PredicateComparable {
+	public boolean equal(String val);
+
+	public boolean notEqual(String val);
+
+	public boolean lessThan(String val);
+
+	public boolean lessEqualThan(String val);
+
+	public boolean greaterThan(String val);
+
+	public boolean greaterEqualThan(String val);
+}

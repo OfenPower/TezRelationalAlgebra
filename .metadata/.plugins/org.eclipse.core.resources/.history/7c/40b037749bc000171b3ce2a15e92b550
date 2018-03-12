@@ -1,0 +1,7 @@
+package de.bachd.bigdata;
+
+import org.apache.tez.runtime.library.processor.SimpleProcessor;
+
+public class TableProcessor extends SimpleProcessor {
+
+}

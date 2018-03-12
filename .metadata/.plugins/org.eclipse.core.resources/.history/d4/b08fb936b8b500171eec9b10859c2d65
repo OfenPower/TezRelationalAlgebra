@@ -1,0 +1,26 @@
+package de.bachd.bigdata;
+
+import java.util.LinkedList;
+
+public class QueryNode {
+
+	private String query;
+	private LinkedList<QueryNode> successorNodes;
+
+	public QueryNode(String name) {
+		this.query = name;
+		successorNodes = new LinkedList<>();
+	}
+
+	public String getQuery() {
+		return query;
+	}
+	
+	public void traverse()
+	{
+		for(QueryNode qn : successorNodes) {
+			
+		}
+	}
+
+}

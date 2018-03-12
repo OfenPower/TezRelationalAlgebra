@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<session version="1.0">
+<refactoring comment="Rename local variable &apos;t&apos; in &apos;de.bachd.bigdata.HashJoinProcessor.run()&apos; to &apos;tuple&apos;&#x0A;- Original project: &apos;bigdata&apos;&#x0A;- Original element: &apos;de.bachd.bigdata.HashJoinProcessor.run().t&apos;&#x0A;- Renamed element: &apos;t&apos;&#x0A;- Update references to refactored element" description="Rename local variable &apos;t&apos;" id="org.eclipse.jdt.ui.rename.local.variable" input="/src\/main\/java&lt;de.bachd.bigdata{HashJoinProcessor.java[HashJoinProcessor~run@t!2155!2198!2161!2161!QTuple;!0!false" name="tuple" references="true" stamp="1512127721633" version="1.0"/>
+</session>

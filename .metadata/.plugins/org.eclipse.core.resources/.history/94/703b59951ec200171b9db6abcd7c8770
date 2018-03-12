@@ -1,0 +1,13 @@
+package de.bachd.bigdata;
+
+import org.apache.tez.runtime.api.AbstractLogicalInput;
+import org.apache.tez.runtime.api.InputContext;
+
+public class CustomInput extends AbstractLogicalInput {
+
+	public CustomInput(InputContext inputContext, int numPhysicalInputs) {
+		super(inputContext, numPhysicalInputs);
+		// TODO Auto-generated constructor stub
+	}
+
+}

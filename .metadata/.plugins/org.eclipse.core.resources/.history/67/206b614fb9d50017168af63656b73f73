@@ -1,0 +1,46 @@
+package de.bachd.bigdata;
+
+import org.apache.tez.runtime.api.ProcessorContext;
+import org.apache.tez.runtime.library.api.KeyValueReader;
+import org.apache.tez.runtime.library.api.KeyValueWriter;
+import org.apache.tez.runtime.library.processor.SimpleProcessor;
+
+import com.google.common.base.Preconditions;
+
+public class SchemeProcessor extends SimpleProcessor {
+
+	public SchemeProcessor(ProcessorContext context) {
+		super(context);
+
+		// DEBUG Working Dirs
+		// String[] dirs = context.getWorkDirs();
+		/*
+		 * for (int i = 0; i < dirs.length; i++) { System.out.println(dirs[i]);
+		 * }
+		 */
+	}
+
+	@Override
+	public void run() throws Exception {
+		Preconditions.checkState(getInputs().size() == 1);
+		Preconditions.checkState(getOutputs().size() == 1);
+
+		KeyValueReader kvReader = (KeyValueReader) getInputs().values().iterator().next().getReader();
+		KeyValueWriter kvWriter = (KeyValueWriter) getOutputs().values().iterator().next().getWriter();
+		while(kvReader.next()) {
+			Text scheme = new Text(kvReader.getCurrentValue().toString())
+		}
+
+		/*
+		 * while (kvReader.next()) { Text scheme = new
+		 * Text(kvReader.getCurrentValue().toString()); NullWritable nullValue =
+		 * NullWritable.get(); kvWriter.write(scheme, nullValue); }
+		 */
+	}
+
+	@Override
+	public void initialize() throws Exception {
+		System.out.println("Initialize SchemeProcessor");
+	}
+
+}

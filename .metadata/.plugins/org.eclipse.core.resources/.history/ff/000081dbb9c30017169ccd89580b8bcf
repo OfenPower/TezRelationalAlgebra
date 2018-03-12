@@ -1,0 +1,9 @@
+package de.bachd.bigdata.streams;
+
+public class FilterStream<T> extends Stream<T> {
+	private Predicater<T> pred;
+
+	public FilterStream(Stream<T> stream, Predicater<T> pred) {
+
+	}
+}

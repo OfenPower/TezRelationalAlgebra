@@ -1,0 +1,96 @@
+package de.bachd.bigdata;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.io.NullWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.tez.common.TezUtils;
+import org.apache.tez.dag.api.UserPayload;
+import org.apache.tez.mapreduce.processor.SimpleMRProcessor;
+import org.apache.tez.runtime.api.ProcessorContext;
+import org.apache.tez.runtime.library.api.KeyValueReader;
+import org.apache.tez.runtime.library.api.KeyValueWriter;
+
+import com.google.common.base.Preconditions;
+import com.google.common.base.Splitter;
+
+/**
+ * Erhält Tuple und projeziert diese auf angegebene Attribute. Schreibt Die
+ * Ergebniswerte als Datei raus
+ *
+ */
+public class ProjectionProcessor extends SimpleMRProcessor {
+
+	private List<String> projectionList;
+
+	public ProjectionProcessor(ProcessorContext context) throws IOException {
+		super(context);
+		projectionList = new ArrayList<>();
+
+		// UserPayload in Configuration konvertieren und Projektionsattribute
+		// holen
+		UserPayload up = getContext().getUserPayload();
+		Configuration conf = TezUtils.createConfFromUserPayload(up);
+		String projection = conf.get("Projection");
+		System.out.println("Projektion auf: " + projection);
+		// Projektionsattribute splitten und der Projektionsliste hinzufügen
+		Iterable<String> projItr = Splitter.on(',').trimResults().omitEmptyStrings().split(projection);
+		for (String s : projItr) {
+			projectionList.add(s);
+		}
+	}
+
+	@Override
+	public void run() throws Exception {
+		Preconditions.checkState(getInputs().size() == 1);
+		Preconditions.checkState(getOutputs().size() == 1);
+		KeyValueReader kvReader = (KeyValueReader) getInputs().values().iterator().next().getReader();
+		KeyValueWriter kvWriter = (KeyValueWriter) getOutputs().values().iterator().next().getWriter();
+		while (kvReader.next()) {
+			Tuple tuple = (Tuple) kvReader.getCurrentKey();
+			Text projectedValues = null;
+			// SELECT * FROM
+			if (projectionList.contains("*")) {
+				// Alle Values rausschreiben
+				List<String> valueList = tuple.getAttributeValues();
+				StringBuilder values = new StringBuilder("");
+				for (int i = 0; i < valueList.size(); i++) {
+					if (i != valueList.size() - 1) {
+						values.append(valueList.get(i)).append("\t");
+					} else {
+						values.append(valueList.get(i));
+					}
+				}
+				projectedValues = new Text(values.toString());
+			} else {
+				// SELECT a, b FROM
+				Map<String, String> columnMap = tuple.getColumnMap();
+				StringBuilder values = new StringBuilder("");
+				for (int i = 0; i < projectionList.size(); i++) {
+					// Projektionsattribut aus Liste holen
+					String column = projectionList.get(i);
+					if (i != projectionList.size() - 1) {
+						// Nur Value für dieses Attribut rausschreiben
+						values.append(columnMap.get(column)).append("\t");
+					} else {
+						values.append(columnMap.get(column));
+					}
+				}
+				projectedValues = new Text(values.toString());
+			}
+			// Projezierte Tupel rausschreiben
+			NullWritable nullValue = NullWritable.get();
+			kvWriter.write(projectedValues, nullValue);
+		}
+	}
+
+	@Override
+	public void initialize() {
+		System.out.println("Initialize ProjectionProcessor");
+	}
+
+}

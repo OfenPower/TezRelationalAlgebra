@@ -1,0 +1,102 @@
+package de.bachd.bigdata;
+
+import java.util.List;
+import java.util.Map;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.util.Tool;
+import org.apache.hadoop.util.ToolRunner;
+import org.apache.tez.client.TezClient;
+import org.apache.tez.dag.api.DAG;
+import org.apache.tez.dag.api.ProcessorDescriptor;
+import org.apache.tez.dag.api.TezConfiguration;
+import org.apache.tez.dag.api.Vertex;
+import org.apache.tez.dag.api.client.DAGClient;
+import org.apache.tez.runtime.api.AbstractLogicalIOProcessor;
+import org.apache.tez.runtime.api.Event;
+import org.apache.tez.runtime.api.LogicalInput;
+import org.apache.tez.runtime.api.LogicalOutput;
+import org.apache.tez.runtime.api.ProcessorContext;
+import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
+
+public class App implements Tool {
+
+	public static class Processor extends AbstractLogicalIOProcessor {
+
+		public Processor(ProcessorContext context) {
+			super(context);
+			System.out.println("Processor Constructor");
+			// TODO Auto-generated constructor stub
+		}
+
+		public void run(Map<String, LogicalInput> arg0, Map<String, LogicalOutput> arg1) throws Exception {
+			System.out.println("Processor Run");
+			// TODO Auto-generated method stub
+			
+		}
+
+		public void close() throws Exception {
+			System.out.println("Processor Close");
+			// TODO Auto-generated method stub
+			
+		}
+
+		public void handleEvents(List<Event> arg0) {
+			System.out.println("Processor HandleEvents");
+			// TODO Auto-generated method stub
+			
+		}
+
+		@Override
+		public void initialize() throws Exception {
+			System.out.println("Processor Initialize");
+			// TODO Auto-generated method stub
+			
+		}
+		
+	}
+	
+	
+	public static void main(String[] args) throws Exception {
+		ToolRunner.run(new App(), args);
+	}
+
+
+	public Configuration getConf() {
+		System.out.println("ToolRunner GetConf");
+		return null;
+	}
+
+
+	public void setConf(Configuration arg0) {
+		System.out.println("ToolRunner SetConf");
+		// TODO Auto-generated method stub
+	}
+
+	public int run(String[] arg0) throws Exception {
+		System.out.println("ToolRunner Run");
+		
+		// Tez-Configuration auf local setzen
+		TezConfiguration conf = new TezConfiguration();
+		conf.setBoolean(TezConfiguration.TEZ_LOCAL_MODE, true);
+		conf.set("fs.default.name", "file:///");
+		conf.setBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH, true);
+		
+		// DAG erzeugen
+		DAG dag = DAG.create("SumDAG");
+		Vertex vertex = Vertex.create("SumVertex", ProcessorDescriptor.create("App.Processor"));
+		dag.addVertex(vertex);
+		
+		TezClient tezclient = TezClient.create("TezJob", conf);
+		DAGClient dagclient = tezclient.submitDAG(dag);
+		tezclient.start();
+		
+		
+		
+		
+		
+		
+		return 0;
+	}
+
+}

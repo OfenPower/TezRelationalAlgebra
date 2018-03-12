@@ -1,0 +1,30 @@
+package de.bachd.bigdata;
+
+import org.apache.tez.runtime.api.ProcessorContext;
+import org.apache.tez.runtime.library.api.KeyValueReader;
+import org.apache.tez.runtime.library.api.KeyValueWriter;
+import org.apache.tez.runtime.library.processor.SimpleProcessor;
+
+import com.google.common.base.Preconditions;
+
+public class HashJoinProcessor extends SimpleProcessor {
+
+	public HashJoinProcessor(ProcessorContext context) {
+		super(context);
+
+	}
+
+	@Override
+	public void run() throws Exception {
+		Preconditions.checkState(getInputs().size() == 2);
+		Preconditions.checkState(getOutputs().size() == 1);
+		KeyValueReader kvReader = (KeyValueReader) getInputs().values().iterator().next().getReader();
+		KeyValueWriter kvWriter = (KeyValueWriter) getOutputs().values().iterator().next().getWriter();
+	}
+
+	@Override
+	public void initialize() {
+		System.out.println("Initialize HashJoinProcessor");
+	}
+
+}

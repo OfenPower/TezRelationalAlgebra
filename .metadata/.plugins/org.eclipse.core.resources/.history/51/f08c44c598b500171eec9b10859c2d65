@@ -1,0 +1,125 @@
+package org.apache.tez.examples;
+
+import java.io.IOException;
+import java.util.StringTokenizer;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
+import org.apache.hadoop.util.Tool;
+import org.apache.hadoop.util.ToolRunner;
+import org.apache.tez.client.TezClient;
+import org.apache.tez.dag.api.DAG;
+import org.apache.tez.dag.api.DataSinkDescriptor;
+import org.apache.tez.dag.api.DataSourceDescriptor;
+import org.apache.tez.dag.api.Edge;
+import org.apache.tez.dag.api.EdgeProperty;
+import org.apache.tez.dag.api.ProcessorDescriptor;
+import org.apache.tez.dag.api.TezConfiguration;
+import org.apache.tez.dag.api.Vertex;
+import org.apache.tez.mapreduce.input.MRInput;
+import org.apache.tez.mapreduce.output.MROutput;
+import org.apache.tez.mapreduce.processor.SimpleMRProcessor;
+import org.apache.tez.runtime.api.LogicalInput;
+import org.apache.tez.runtime.api.LogicalOutput;
+import org.apache.tez.runtime.api.ProcessorContext;
+import org.apache.tez.runtime.library.api.KeyValueReader;
+import org.apache.tez.runtime.library.api.KeyValueWriter;
+import org.apache.tez.runtime.library.api.KeyValuesReader;
+import org.apache.tez.runtime.library.conf.OrderedPartitionedKVEdgeConfig;
+import org.apache.tez.runtime.library.partitioner.HashPartitioner;
+import org.apache.tez.runtime.library.processor.SimpleProcessor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.google.common.base.Preconditions;
+
+public class WordCount extends TezExampleBase {
+    static String INPUT = "Input";
+    static String OUTPUT = "Output";
+    static String TOKENIZER = "Tokenizer";
+    static String SUMMATION = "Summation";
+    private static final Logger LOG = LoggerFactory.getLogger(WordCount.class);
+
+    public static class TokenProcessor extends SimpleProcessor {
+        IntWritable one = new IntWritable(1);
+        Text word = new Text();
+
+        public TokenProcessor(ProcessorContext context) {
+            super(context);
+        }
+
+        public void run() throws Exception {
+            Preconditions.checkArgument((boolean)(this.getInputs().size() == 1));
+            Preconditions.checkArgument((boolean)(this.getOutputs().size() == 1));
+            KeyValueReader kvReader = (KeyValueReader)((LogicalInput)this.getInputs().get(WordCount.INPUT)).getReader();
+            KeyValueWriter kvWriter = (KeyValueWriter)((LogicalOutput)this.getOutputs().get(WordCount.SUMMATION)).getWriter();
+            while (kvReader.next()) {
+                StringTokenizer itr = new StringTokenizer(kvReader.getCurrentValue().toString());
+                while (itr.hasMoreTokens()) {
+                    this.word.set(itr.nextToken());
+                    kvWriter.write((Object)this.word, (Object)this.one);
+                }
+            }
+        }
+    }
+    
+    public static class SumProcessor extends SimpleMRProcessor {
+        public SumProcessor(ProcessorContext context) {
+            super(context);
+        }
+
+        public void run() throws Exception {
+            Preconditions.checkArgument((boolean)(this.getInputs().size() == 1));
+            Preconditions.checkArgument((boolean)(this.getOutputs().size() == 1));
+            KeyValueWriter kvWriter = (KeyValueWriter)((LogicalOutput)this.getOutputs().get(WordCount.OUTPUT)).getWriter();
+            KeyValuesReader kvReader = (KeyValuesReader)((LogicalInput)this.getInputs().get(WordCount.TOKENIZER)).getReader();
+            while (kvReader.next()) {
+                Text word = (Text)kvReader.getCurrentKey();
+                int sum = 0;
+                for (Object value : kvReader.getCurrentValues()) {
+                    sum += ((IntWritable)value).get();
+                }
+                kvWriter.write((Object)word, (Object)new IntWritable(sum));
+            }
+        }
+    }
+    
+    
+
+    private DAG createDAG(TezConfiguration tezConf, String inputPath, String outputPath, int numPartitions) throws IOException {
+        DataSourceDescriptor dataSource = MRInput.createConfigBuilder((Configuration)new Configuration((Configuration)tezConf), TextInputFormat.class, (String)inputPath).groupSplits(!this.isDisableSplitGrouping()).generateSplitsInAM(!this.isGenerateSplitInClient()).build();
+        DataSinkDescriptor dataSink = MROutput.createConfigBuilder((Configuration)new Configuration((Configuration)tezConf), TextOutputFormat.class, (String)outputPath).build();
+        Vertex tokenizerVertex = Vertex.create((String)TOKENIZER, (ProcessorDescriptor)ProcessorDescriptor.create((String)TokenProcessor.class.getName())).addDataSource(INPUT, dataSource);
+        OrderedPartitionedKVEdgeConfig edgeConf = OrderedPartitionedKVEdgeConfig.newBuilder((String)Text.class.getName(), (String)IntWritable.class.getName(), (String)HashPartitioner.class.getName()).setFromConfiguration((Configuration)tezConf).build();
+        Vertex summationVertex = Vertex.create((String)SUMMATION, (ProcessorDescriptor)ProcessorDescriptor.create((String)SumProcessor.class.getName()), (int)numPartitions).addDataSink(OUTPUT, dataSink);
+        DAG dag = DAG.create((String)"WordCount");
+        dag.addVertex(tokenizerVertex).addVertex(summationVertex).addEdge(Edge.create((Vertex)tokenizerVertex, (Vertex)summationVertex, (EdgeProperty)edgeConf.createDefaultEdgeProperty()));
+        return dag;
+    }
+
+    protected void printUsage() {
+        System.err.println("Usage:  wordcount in out [numPartitions]");
+    }
+
+    protected int validateArgs(String[] otherArgs) {
+        if (otherArgs.length < 2 || otherArgs.length > 3) {
+            return 2;
+        }
+        return 0;
+    }
+
+    protected int runJob(String[] args, TezConfiguration tezConf, TezClient tezClient) throws Exception {
+        DAG dag = this.createDAG(tezConf, args[0], args[1], args.length == 3 ? Integer.parseInt(args[2]) : 1);
+        LOG.info("Running WordCount");
+        return this.runDag(dag, this.isCountersLog(), LOG);
+    }
+
+    public static void main(String[] args) throws Exception {
+        int res = ToolRunner.run((Configuration)new Configuration(), (Tool)new WordCount(), (String[])args);
+        System.exit(res);
+    }
+}
+

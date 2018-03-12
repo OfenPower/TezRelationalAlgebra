@@ -1,0 +1,152 @@
+package de.bachd.bigdata;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.io.NullWritable;
+import org.apache.tez.common.TezUtils;
+import org.apache.tez.dag.api.UserPayload;
+import org.apache.tez.runtime.api.ProcessorContext;
+import org.apache.tez.runtime.library.api.KeyValueReader;
+import org.apache.tez.runtime.library.api.KeyValueWriter;
+import org.apache.tez.runtime.library.processor.SimpleProcessor;
+
+import com.google.common.base.CharMatcher;
+import com.google.common.base.Splitter;
+import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.ListMultimap;
+
+/**
+ * Der HashJoinProcessor implementiert einen Equi-Join der folgenden Form:
+ * 
+ * "R join S on R.A = S.A
+ */
+
+public class HashJoinProcessor extends SimpleProcessor {
+
+	private String leftSideRelation;
+	private String leftSideJoinAttribute;
+	private String rightSideRelation;
+	private String rightSideJoinAttribute;
+
+	public HashJoinProcessor(ProcessorContext context) {
+		super(context);
+	}
+
+	@Override
+	public void run() throws Exception {
+		// KeyValueReader und Writer initialisieren
+		KeyValueReader kvReader1 = (KeyValueReader) getInputs().get("ArtikelTableProcessor").getReader();
+		KeyValueReader kvReader2 = (KeyValueReader) getInputs().get("LiegenTableProcessor").getReader();
+		KeyValueWriter kvWriter = (KeyValueWriter) getOutputs().values().iterator().next().getWriter();
+		ListMultimap<String, Tuple> joinMultimap = ArrayListMultimap.create();
+
+		// Alle Tupel der linken Join-Relation in die Hashmap laden
+		while (kvReader1.next()) {
+			Tuple tuple = (Tuple) kvReader1.getCurrentKey();
+			String value = tuple.getColumnStringMap().get(this.leftSideJoinAttribute);
+
+			// Tupleobjekt kopieren und in Hashmap laden
+			// key = joinattribut, value = kopiertes Tuple
+			Tuple copiedTuple = Tuple.copyTuple(tuple);
+			// joinMap.put(value, copiedTuple);
+			joinMultimap.put(value, copiedTuple);
+		}
+
+		System.out.println("---------------------------------------");
+
+		// Die Hashmap ist nach der ersten while-Schleife mit Tupeln der linken
+		// Relation aufgebaut. Alle Tupel des zweiten Readers werden nun mit den
+		// Tupeln des ersten Readers gejoint, falls das jeweilige Joinattribut
+		// in der HashMap vorkommt.
+		while (kvReader2.next()) {
+			Tuple rightTuple = (Tuple) kvReader2.getCurrentKey();
+			// HashMap besteht aus leftSide-Tupeln => rightSideJoinAttribute
+			// zum Zugriff auf Attribute benutzen
+			String joinAttribute = rightTuple.getColumnStringMap().get(this.rightSideJoinAttribute);
+			// Kommt joinAttribute in HashMap vor?
+			if (joinMultimap.containsKey(joinAttribute)) {
+				// => rightTuple mit allen gemappten leftTuple joinen!
+				List<Tuple> leftTuples = joinMultimap.get(joinAttribute);
+				// Falls leftTuple noch nicht mit einem der rightTuple gejoined
+				// wurde (isJoined = false):
+				// Umbenennung der Attribute des leftTuple, indem die jeweilige
+				// Relation als Präfix dran gestellt wird! (z.B wird aus ArtNr
+				// => Artikel.ArtNr)
+				List<String> newLeftAttributeNames = new ArrayList<>();
+				List<String> newRightAttributeNames = new ArrayList<>();
+				for(Tuple leftTuple : leftTuples) {
+					
+				if (!leftTuple.getJoinFlag()) {
+					// => leftSideRelation als Präfix an attributeName der
+					// leftTuple dranhängen
+					List<String> leftAttributeNames = leftTuple.getAttributeNames();
+					for (int i = 0; i < leftAttributeNames.size(); i++) {
+						newLeftAttributeNames.add(leftSideRelation + "." + leftAttributeNames.get(i));
+					}
+					leftTuple.setAttributeNames(newLeftAttributeNames);
+					leftTuple.setJoinFlag(true);
+				} }
+				// rightTuple nach gleichem Muster umbenennen (Präfix
+				// dranstellen)
+				List<String> rightAttributeNames = rightTuple.getAttributeNames();
+				for (int i = 0; i < rightAttributeNames.size(); i++) {
+					newRightAttributeNames.add(rightSideRelation + "." + rightAttributeNames.get(i));
+				}
+				rightTuple.setAttributeNames(newRightAttributeNames);
+				rightTuple.setJoinFlag(true);
+
+				// Join ausführen!
+				// ---------------------------------------------------------
+				List<String> joinedRelations = new ArrayList<>(leftTuple.getRelationNames());
+				joinedRelations.addAll(rightTuple.getRelationNames());
+				List<String> joinedNames = new ArrayList<>(leftTuple.getAttributeNames());
+				joinedNames.addAll(rightTuple.getAttributeNames());
+				List<String> joinedDomains = new ArrayList<>(leftTuple.getAttributeDomains());
+				joinedDomains.addAll(rightTuple.getAttributeDomains());
+				List<String> joinedValues = new ArrayList<>(leftTuple.getAttributeValues());
+				joinedValues.addAll(rightTuple.getAttributeValues());
+				// ---------------------------------------------------------
+				Tuple joinedTuple = new Tuple();
+				joinedTuple.set(joinedRelations, joinedNames, joinedDomains, joinedValues);
+				// DEBUG
+				joinedTuple.printColumnValues();
+				NullWritable nullValue = NullWritable.get();
+				kvWriter.write(joinedTuple, nullValue);
+			}
+		}
+	}
+
+	@Override
+	public void initialize() throws IOException {
+		System.out.println("Initialize HashJoinProcessor");
+		UserPayload up = getContext().getUserPayload();
+		Configuration conf = TezUtils.createConfFromUserPayload(up);
+		String attributes = conf.get("JoinAttribute");
+		// Join-String splitten und in linke/rechte Relation und linkes/rechtes
+		// Joinattribut aufteilen
+		Iterable<String> attrItr = Splitter.on(CharMatcher.anyOf(".").or(CharMatcher.anyOf(" = "))).trimResults()
+				.omitEmptyStrings().split(attributes);
+		Iterator<String> attrIterator = attrItr.iterator();
+		while (attrIterator.hasNext()) {
+			this.leftSideRelation = attrIterator.next();
+			this.leftSideJoinAttribute = attrIterator.next();
+			this.rightSideRelation = attrIterator.next();
+			this.rightSideJoinAttribute = attrIterator.next();
+		}
+
+		// DEBUG: Join anzeigen!
+		System.out.println("Join on: " + attributes);
+
+		// DEBUG: Joinrelationen und Attribute anzeigen lassen
+		// System.out.println("Linke Relation: " + this.leftSideRelation);
+		// System.out.println("Linkes Joinattribut: " +
+		// this.leftSideJoinAttribute);
+		// System.out.println("Rechte Relation: " + this.rightSideRelation);
+		// System.out.println("Rechtes Joinattribut: " +
+		// this.rightSideJoinAttribute);
+	}
+}

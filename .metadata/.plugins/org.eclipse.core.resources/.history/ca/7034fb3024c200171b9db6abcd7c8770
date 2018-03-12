@@ -1,0 +1,58 @@
+package de.bachd.bigdata;
+
+import java.util.ArrayList;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.io.NullWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.tez.common.TezUtils;
+import org.apache.tez.mapreduce.processor.SimpleMRProcessor;
+import org.apache.tez.runtime.api.Input;
+import org.apache.tez.runtime.api.LogicalInput;
+import org.apache.tez.runtime.api.ProcessorContext;
+import org.apache.tez.runtime.library.api.KeyValueReader;
+import org.apache.tez.runtime.library.api.KeyValueWriter;
+
+public class TableProcessor extends SimpleMRProcessor {
+
+	public TableProcessor(ProcessorContext context) {
+		super(context);
+		System.out.println("TableProcessor Parallelism: " + context.getVertexParallelism());
+		Configuration conf = TezUtils.createConfFromUserPayload(context.getUserPayload());
+	}
+
+	@Override
+	public void preOp() throws Exception {
+		super.preOp();
+
+		// Knoten blockieren, solange Schema noch nicht gelesen wurde
+		LogicalInput schemeInput = getInputs().get(App.V2);
+		ArrayList<Input> blockingInputs = new ArrayList<>();
+		blockingInputs.add(schemeInput);
+		getContext().waitForAllInputsReady(blockingInputs);
+	}
+
+	@Override
+	public void run() throws Exception {
+		KeyValueReader kvDataReader = (KeyValueReader) getInputs().get(App.V1).getReader();
+		KeyValueReader kvSchemeReader = (KeyValueReader) getInputs().get(App.V2).getReader();
+		KeyValueWriter kvOutputWriter = (KeyValueWriter) getOutputs().get(App.TABLEOUTPUT).getWriter();
+		Configuration conf = TezUtils.createConfFromUserPayload(getContext().getUserPayload());
+		// System.out.println(conf.get("keyTest"));
+		if (kvSchemeReader.next()) {
+			NullWritable nullKey = NullWritable.get();
+			Text scheme = new Text(kvSchemeReader.getCurrentValue().toString());
+			kvOutputWriter.write(nullKey, scheme);
+		}
+		while (kvDataReader.next()) {
+			NullWritable nullKey = NullWritable.get();
+			Text row = new Text(kvDataReader.getCurrentValue().toString());
+			kvOutputWriter.write(nullKey, row);
+		}
+	}
+
+	@Override
+	public void initialize() throws Exception {
+		System.out.println("Initialize");
+	}
+}

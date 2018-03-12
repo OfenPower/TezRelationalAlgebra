@@ -1,0 +1,53 @@
+package de.bachd.bigdata;
+
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+
+import org.apache.hadoop.io.NullWritable;
+import org.apache.tez.mapreduce.processor.SimpleMRProcessor;
+import org.apache.tez.runtime.api.ProcessorContext;
+import org.apache.tez.runtime.library.api.KeyValueReader;
+import org.apache.tez.runtime.library.api.KeyValueWriter;
+
+import com.google.common.base.Preconditions;
+import com.google.common.base.Splitter;
+
+public class SchemeProcessor extends SimpleMRProcessor {
+
+	public SchemeProcessor(ProcessorContext context) {
+		super(context);
+	}
+
+	@Override
+	public void run() throws Exception {
+		Preconditions.checkState(getInputs().size() == 1);
+		Preconditions.checkState(getOutputs().size() == 1);
+
+		KeyValueReader kvReader = (KeyValueReader) getInputs().values().iterator().next().getReader();
+		KeyValueWriter kvWriter = (KeyValueWriter) getOutputs().values().iterator().next().getWriter();
+		while (kvReader.next()) {
+			System.out.println("SchemeProcessor -> next");
+			String row = kvReader.getCurrentValue().toString();
+			// Columns aus .scheme Datei erzeugen
+			Iterable<String> attr = Splitter.on('\t').trimResults().omitEmptyStrings().split(row);
+			List<Column> cols = new ArrayList<>();
+			for (String s : attr) {
+				Iterable<String> attributes = Splitter.on(':').trimResults().omitEmptyStrings().split(s);
+				Iterator<String> attrItr = attributes.iterator();
+				String attributeName = attrItr.next();
+				String domain = attrItr.next();
+				Column col = new Column(attributeName, domain);
+				cols.add(col);
+			}
+			// Columns in Scheme-Objekt speichern und als key weiterreichen
+			Column[] colArray = new Column[cols.size()];
+			colArray = cols.toArray(colArray);
+			Scheme scheme = new Scheme();
+			scheme.addValues(colArray);
+			
+			NullWritable nullValue = NullWritable.get();
+			kvWriter.write(col, nullValue);
+		}
+	}
+}

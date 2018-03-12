@@ -1,0 +1,27 @@
+1512306682545	Rename field 'relationNames'
+1512306688003	Rename field 'attributeNames'
+1512306694615	Rename field 'attributeDomains'
+1512306699812	Rename field 'attributeValues'
+1512306980119	Rename method 'getRelationNames'
+1512307081189	Rename method 'getAttributeNames'
+1512307123744	Rename method 'getAttributeDomains'
+1512307130659	Rename method 'getAttributeValues'
+1512307243722	Rename method 'getColumnValueStringMap'
+1512307306009	Rename method 'getColumnValueCompMap'
+1512333360627	Rename local variable 'leftTuple'
+1512333369675	Rename local variable 'rightTuple'
+1512333379237	Rename local variable 'rightTuple2'
+1512469418986	Rename method 'setIsJoined'
+1512469429325	Rename method 'getIsJoined'
+1512547632855	Rename local variable 'attributes'
+1512736526526	Delete element
+1512745332994	Rename local variable 'v7'
+1512745588229	Rename local variable 'e6'
+1512810465423	Rename local variable 'parameterConf'
+1512810477916	Rename local variable 'parameter'
+1512812722589	Move compilation unit
+1512812790602	Move compilation units
+1512812823071	Rename package 'de.bachd.bigdata'
+1512812838167	Rename package 'de.bachd.bigdata'
+1512812881276	Delete element
+1512813609672	Move compilation units

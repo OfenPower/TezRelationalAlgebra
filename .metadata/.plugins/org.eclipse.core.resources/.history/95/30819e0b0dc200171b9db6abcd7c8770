@@ -1,0 +1,108 @@
+package de.bachd.bigdata;
+
+import java.io.IOException;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.conf.Configured;
+import org.apache.hadoop.io.NullWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
+import org.apache.hadoop.util.Tool;
+import org.apache.hadoop.util.ToolRunner;
+import org.apache.tez.client.TezClient;
+import org.apache.tez.dag.api.DAG;
+import org.apache.tez.dag.api.DataSinkDescriptor;
+import org.apache.tez.dag.api.DataSourceDescriptor;
+import org.apache.tez.dag.api.Edge;
+import org.apache.tez.dag.api.ProcessorDescriptor;
+import org.apache.tez.dag.api.TezConfiguration;
+import org.apache.tez.dag.api.TezException;
+import org.apache.tez.dag.api.Vertex;
+import org.apache.tez.dag.api.client.DAGClient;
+import org.apache.tez.dag.api.client.DAGStatus;
+import org.apache.tez.mapreduce.input.MRInput;
+import org.apache.tez.mapreduce.output.MROutput;
+import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
+import org.apache.tez.runtime.library.conf.UnorderedKVEdgeConfig;
+
+/**
+ * Hello World!
+ *
+ */
+public class App extends Configured implements Tool {
+
+	public static final String DATAINPUT = "DataInput";
+	public static final String DATAOUTPUT = "DataOutput";
+	public static final String SCHEMEINPUT = "SchemeInput";
+	public static final String TABLEOUTPUT = "TableOutput";
+	public static final String V1 = "v1";
+	public static final String V2 = "v2";
+	public static final String V3 = "v3";
+	public static final String V4 = "v4";
+
+	@Override
+	public int run(String[] args) throws Exception {
+		// Tez lokal aufsetzen
+		TezConfiguration tezConf = new TezConfiguration(getConf());
+		tezConf.setBoolean(TezConfiguration.TEZ_LOCAL_MODE, true);
+		tezConf.set("fs.default.name", "file:///");
+		tezConf.setBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH, true);
+
+		// TezClient starten
+		TezClient tezClient = TezClient.create("TezClient", tezConf);
+		tezClient.start();
+
+		return runJob(args, tezConf, tezClient);
+	}
+
+	private int runJob(String[] args, TezConfiguration tezConf, TezClient tezClient) throws TezException, IOException {
+
+		// URI der Tabelle aus Kommandozeilenargument basteln
+		String tableName = args[0];
+		String tableData = tableName + ".csv";
+		String tableScheme = tableName + ".scheme";
+		String tableOutput = args[1];
+
+		// DataSource und DataSink erzeugen
+
+		DataSourceDescriptor dataSource = MRInput
+				.createConfigBuilder(new Configuration(tezConf), TextInputFormat.class, tableData).build();
+		DataSourceDescriptor schemeSource = MRInput
+				.createConfigBuilder(new Configuration(tezConf), TextInputFormat.class, tableScheme).build();
+		DataSinkDescriptor dataSink = MROutput
+				.createConfigBuilder(new Configuration(tezConf), TextOutputFormat.class, "output.csv").build();
+
+		// Vertices erzeugen
+		Vertex v1 = Vertex.create(V1, ProcessorDescriptor.create(DataProcessor.class.getName()));
+		v1.addDataSource(DATAINPUT, dataSource);
+		Vertex v2 = Vertex.create(V2, ProcessorDescriptor.create(SchemeProcessor.class.getName()));
+		v2.addDataSource(SCHEMEINPUT, schemeSource);
+		Vertex v3 = Vertex.create(V3, ProcessorDescriptor.create(TableProcessor.class.getName()), 1);
+		v3.addDataSink(TABLEOUTPUT, dataSink);
+
+		// Edges erzeugen
+		UnorderedKVEdgeConfig e = UnorderedKVEdgeConfig.newBuilder(NullWritable.class.getName(), Text.class.getName())
+				.setFromConfiguration(tezConf).build();
+		Edge e1 = Edge.create(v1, v3, e.createDefaultBroadcastEdgeProperty());
+		Edge e2 = Edge.create(v2, v3, e.createDefaultBroadcastEdgeProperty());
+
+		// Graph erzeugen und starten
+		DAG dag = DAG.create("dag");
+		dag.addVertex(v1).addVertex(v2).addVertex(v3).addEdge(e1).addEdge(e2);
+		DAGClient dagClient = tezClient.submitDAG(dag);
+		try {
+			DAGStatus dagStatus;
+			dagStatus = dagClient.waitForCompletionWithStatusUpdates(null);
+			System.out.println("DAG diagnostics: " + dagStatus.getDiagnostics());
+		} catch (InterruptedException ex) {
+			ex.printStackTrace();
+		}
+
+		return 0;
+	}
+
+	public static void main(String[] args) throws Exception {
+		ToolRunner.run(new Configuration(), new App(), args);
+	}
+}

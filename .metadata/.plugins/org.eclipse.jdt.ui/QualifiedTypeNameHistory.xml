@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<qualifiedTypeNameHistroy>
+<fullyQualifiedTypeName name="org.apache.hadoop.util.Tool"/>
+<fullyQualifiedTypeName name="org.apache.hadoop.util.ToolRunner"/>
+<fullyQualifiedTypeName name="org.apache.tez.client.TezClient"/>
+<fullyQualifiedTypeName name="de.bachd.bigdata.TezExampleBase"/>
+<fullyQualifiedTypeName name="org.apache.tez.dag.api.EdgeProperty"/>
+<fullyQualifiedTypeName name="com.google.common.collect.Queues"/>
+</qualifiedTypeNameHistroy>

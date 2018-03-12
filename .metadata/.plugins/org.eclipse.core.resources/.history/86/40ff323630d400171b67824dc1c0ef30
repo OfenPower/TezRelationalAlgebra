@@ -1,0 +1,54 @@
+package de.bachd.bigdata;
+
+import java.util.Iterator;
+
+import org.apache.hadoop.io.NullWritable;
+import org.apache.tez.runtime.api.LogicalInput;
+import org.apache.tez.runtime.api.ProcessorContext;
+import org.apache.tez.runtime.library.api.KeyValueReader;
+import org.apache.tez.runtime.library.api.KeyValueWriter;
+import org.apache.tez.runtime.library.processor.SimpleProcessor;
+
+public class HashJoinProcessor extends SimpleProcessor {
+
+	public HashJoinProcessor(ProcessorContext context) {
+		super(context);
+
+	}
+
+	@Override
+	public void run() throws Exception {
+		// Check, ob 2 Inputs und 1 Output vorhanden ist
+		// KeyValueReader und Writer initialisieren
+		KeyValueReader kvReader1 = null;
+		KeyValueReader kvReader2 = null;
+		Iterator<LogicalInput> kvReaderItr = getInputs().values().iterator();
+		while (kvReaderItr.hasNext()) {
+			kvReader1 = (KeyValueReader) kvReaderItr.next().getReader();
+			kvReader2 = (KeyValueReader) kvReaderItr.next().getReader();
+		}
+		KeyValueWriter kvWriter = (KeyValueWriter) getOutputs().values().iterator().next().getWriter();
+
+		if (kvReader1 != null) {
+			System.out.println("kvReader1 != null");
+		}
+		if (kvReader2 != null) {
+			System.out.println("kvReader2 != null");
+		}
+
+		// Alle Tupel aus Reader1 in HashMap schreiben
+		while (kvReader1.next()) {
+			// DEBUG: Alle Tupel aus Reader1 direkt rausschreiben!
+			Tuple t = (Tuple) kvReader1.getCurrentKey();
+			NullWritable nullValue = NullWritable.get();
+			kvWriter.write(t, nullValue);
+		}
+
+	}
+
+	@Override
+	public void initialize() {
+		System.out.println("Initialize HashJoinProcessor");
+	}
+
+}

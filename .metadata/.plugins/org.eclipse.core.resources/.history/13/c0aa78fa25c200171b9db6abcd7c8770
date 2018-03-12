@@ -1,0 +1,15 @@
+package de.bachd.bigdata;
+
+import java.util.List;
+
+import org.apache.tez.runtime.api.AbstractLogicalInput;
+import org.apache.tez.runtime.api.Event;
+import org.apache.tez.runtime.api.InputContext;
+import org.apache.tez.runtime.api.Reader;
+import org.apache.tez.runtime.library.input.UnorderedKVInput;
+
+public class CustomInput extends UnorderedKVInput {
+
+	
+
+}

@@ -1,0 +1,27 @@
+package de.bachd.bigdata;
+
+import java.util.LinkedList;
+
+public class Query {
+
+	private static LinkedList<QueryNode> nodes; // Liste von adjazenzlisten
+
+	private Query() {
+
+	}
+
+	public void print() {
+		for (QueryNode qn : nodes) {
+			System.out.println(qn.getQuery());
+		}
+	}
+
+	public static void select(String... strings) {
+		
+	}
+
+	public static void addNode(QueryNode node) {
+		nodes.add(node);
+	}
+
+}

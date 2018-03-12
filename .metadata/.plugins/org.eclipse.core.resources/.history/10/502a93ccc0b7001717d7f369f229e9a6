@@ -1,0 +1,8 @@
+package de.bachd.bigdata;
+
+public class QueryBuilder {
+
+	public static void select(String... strings) {
+	}
+
+}

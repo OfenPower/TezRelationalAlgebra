@@ -1,0 +1,202 @@
+package de.bachd.bigdata;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.io.NullWritable;
+import org.apache.tez.common.TezUtils;
+import org.apache.tez.dag.api.UserPayload;
+import org.apache.tez.runtime.api.LogicalInput;
+import org.apache.tez.runtime.api.ProcessorContext;
+import org.apache.tez.runtime.library.api.KeyValueReader;
+import org.apache.tez.runtime.library.api.KeyValueWriter;
+import org.apache.tez.runtime.library.processor.SimpleProcessor;
+
+import com.google.common.base.CharMatcher;
+import com.google.common.base.Splitter;
+
+/**
+ * Der HashJoinProcessor implementiert einen Equi-Join der folgenden Form:
+ * 
+ * "R join S on R.A = S.A
+ */
+
+// -----------------------------------------------------------------
+// ToDo:
+// - HashMap nur mit Tupeln der LINKEN Join-Relation aufbauen!
+// - Relation vor gleichbenannte Spalten stellen? (Artikel.ArtNr)
+// -----------------------------------------------------------------
+
+public class HashJoinProcessor extends SimpleProcessor {
+
+	private String leftSideRelation;
+	private String leftSideJoinAttribute;
+	private String rightSideRelation;
+	private String rightSideJoinAttribute;
+
+	public HashJoinProcessor(ProcessorContext context) {
+		super(context);
+	}
+
+	@Override
+	public void run() throws Exception {
+		// KeyValueReader und Writer initialisieren
+		KeyValueReader kvReader1 = null;
+		KeyValueReader kvReader2 = null;
+		Iterator<LogicalInput> kvReaderItr = getInputs().values().iterator();
+		while (kvReaderItr.hasNext()) {
+			kvReader1 = (KeyValueReader) kvReaderItr.next().getReader();
+			kvReader2 = (KeyValueReader) kvReaderItr.next().getReader();
+		}
+		KeyValueWriter kvWriter = (KeyValueWriter) getOutputs().values().iterator().next().getWriter();
+		Map<String, Tuple> joinMap = new HashMap<>(); // HashMap, welche zum
+														// joinen verwendet
+														// wird!
+
+		// Herausfinden, welcher Reader welche Tupel enthält. Hierzu wird der
+		// Relationsname des Tupels mit "leftSideRelation" verglichen.
+		// Anschließend wird die HashMap aufgebaut.
+		boolean firstTupleChecked = false;
+		boolean leftSideRelationTupleFound = false;
+		while (kvReader1.next()) {
+			Tuple tuple = (Tuple) kvReader1.getCurrentKey();
+			if (!firstTupleChecked) {
+				// Kommt leftSideRelation in der Liste der Relationen des Tupels
+				// vor?
+				List<String> relationNames = tuple.getRelationNames();
+				if (relationNames.contains(this.leftSideRelation)) {
+					leftSideRelationTupleFound = true;
+					System.out.println("Reader contains " + leftSideRelation + "-Tuple");
+				} else {
+					System.out.println("Reader contains " + rightSideRelation + "-Tuple");
+				}
+				firstTupleChecked = true;
+			}
+
+			// HashMap abhängig der Bedingungn je mit
+			// leftSide/rightSideJoinAttribute befüllen
+			String value = null;
+			if (leftSideRelationTupleFound) {
+				value = tuple.getColumnStringMap().get(this.leftSideJoinAttribute);
+			} else {
+				value = tuple.getColumnStringMap().get(this.rightSideJoinAttribute);
+			}
+			// System.out.print(value + "\t" + value.hashCode() + "\t" +
+			// tuple.hashCode() + "\t");
+			// PrintSelectedTuple(tuple);
+			System.out.println("Key before Map: " + value);
+			PrintSelectedTuple(tuple);
+			Tuple copiedTuple = Tuple.copyTuple(tuple);
+			joinMap.put(value, copiedTuple);
+		}
+
+		System.out.println("---------------------------------------");
+
+		for (String s : joinMap.keySet()) {
+			// System.out.print(s + "\t" + joinMap.get(s).hashCode());
+			// PrintSelectedTuple(joinMap.get(s));
+			// System.out.println();
+		}
+
+		System.out.println("---------------------------------------");
+
+		// Die Hashmap ist nach der ersten while-Schleife aufgebaut. Wenn
+		// leftSideRelationTupleFound = true, dann enthält die HashMap Tupel der
+		// linken Relationen, sonst Tupel der rechten Relation.
+		// Alle Tupel des zweiten Readers werden nun mit den Tupeln des ersten
+		// Readers gejoint, falls das jeweilige Joinattribut in der HashMap
+		// vorkommt.
+		while (kvReader2.next()) {
+			Tuple leftTuple = (Tuple) kvReader2.getCurrentKey();
+			String joinAttribute = null;
+			if (leftSideRelationTupleFound) {
+				// HashMap besteht aus leftSide-Tupeln => rightSideJoinAttribute
+				// benutzen!
+				joinAttribute = leftTuple.getColumnStringMap().get(this.rightSideJoinAttribute);
+			} else {
+				joinAttribute = leftTuple.getColumnStringMap().get(this.leftSideJoinAttribute);
+			}
+
+			// Kommt value in HashMap vor?
+			if (joinMap.containsKey(joinAttribute)) {
+				// => tuple und jointuple miteinander joinen!
+				Tuple rightTuple = joinMap.get(joinAttribute);
+				List<String> leftRelations = leftTuple.getRelationNames();
+				List<String> leftNames = leftTuple.getAttributeNames();
+				List<String> leftDomains = leftTuple.getAttributeDomains();
+				List<String> leftValues = leftTuple.getAttributeValues();
+				// ---------------------------------------------------------
+				List<String> rightRelations = rightTuple.getRelationNames();
+				List<String> rightNames = rightTuple.getAttributeNames();
+				List<String> rightDomains = rightTuple.getAttributeDomains();
+				List<String> rightValues = rightTuple.getAttributeValues();
+				// ---------------------------------------------------------
+				List<String> joinedRelations = new ArrayList<>(leftRelations);
+				joinedRelations.addAll(rightRelations);
+				List<String> joinedNames = new ArrayList<>(leftNames);
+				joinedNames.addAll(rightNames);
+				List<String> joinedDomains = new ArrayList<>(leftDomains);
+				joinedDomains.addAll(rightDomains);
+				List<String> joinedValues = new ArrayList<>(leftValues);
+				joinedValues.addAll(rightValues);
+				// ---------------------------------------------------------
+				Tuple joinedTuple = new Tuple();
+				joinedTuple.set(joinedRelations, joinedNames, joinedDomains, joinedValues);
+				// DEBUG
+				for (int i = 0; i < joinedNames.size(); i++) {
+					System.out.print(joinedNames.get(i) + "\t");
+				}
+				System.out.println();
+				for (int i = 0; i < joinedValues.size(); i++) {
+					System.out.print(joinedValues.get(i) + "\t");
+				}
+				System.out.println();
+				NullWritable nullValue = NullWritable.get();
+				kvWriter.write(joinedTuple, nullValue);
+			}
+		}
+	}
+
+	@Override
+	public void initialize() throws IOException {
+		System.out.println("Initialize HashJoinProcessor");
+		UserPayload up = getContext().getUserPayload();
+		Configuration conf = TezUtils.createConfFromUserPayload(up);
+		String attributes = conf.get("JoinAttribute");
+		// Join-String splitten und in linke/rechte Relation und linkes/rechtes
+		// Joinattribut aufteilen
+		Iterable<String> attrItr = Splitter.on(CharMatcher.anyOf(".").or(CharMatcher.anyOf(" = "))).trimResults()
+				.omitEmptyStrings().split(attributes);
+		Iterator<String> attrIterator = attrItr.iterator();
+		while (attrIterator.hasNext()) {
+			this.leftSideRelation = attrIterator.next();
+			this.leftSideJoinAttribute = attrIterator.next();
+			this.rightSideRelation = attrIterator.next();
+			this.rightSideJoinAttribute = attrIterator.next();
+		}
+
+		// DEBUG: Join anzeigen!
+		System.out.println("Join on: " + attributes);
+
+		// DEBUG: Joinrelationen und Attribute anzeigen lassen
+		// System.out.println("Linke Relation: " + this.leftSideRelation);
+		// System.out.println("Linkes Joinattribut: " +
+		// this.leftSideJoinAttribute);
+		// System.out.println("Rechte Relation: " + this.rightSideRelation);
+		// System.out.println("Rechtes Joinattribut: " +
+		// this.rightSideJoinAttribute);
+	}
+
+	private static void PrintSelectedTuple(Tuple tuple) {
+		List<String> l = tuple.getAttributeValues();
+		for (String t1 : l) {
+			System.out.print(t1 + "\t");
+		}
+	}
+
+}

@@ -1,0 +1,66 @@
+package de.bachd.bigdata;
+
+import java.io.IOException;
+import java.util.List;
+import java.util.function.Predicate;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.io.NullWritable;
+import org.apache.tez.common.TezUtils;
+import org.apache.tez.dag.api.UserPayload;
+import org.apache.tez.mapreduce.processor.SimpleMRProcessor;
+import org.apache.tez.runtime.api.ProcessorContext;
+import org.apache.tez.runtime.library.api.KeyValueReader;
+import org.apache.tez.runtime.library.api.KeyValueWriter;
+
+import com.google.common.base.Preconditions;
+
+public class SelectionProcessor extends SimpleMRProcessor {
+
+	private Predicate<Tuple> p;
+
+	public SelectionProcessor(ProcessorContext context) throws IOException {
+		super(context);
+
+		UserPayload up = getContext().getUserPayload();
+		Configuration conf = TezUtils.createConfFromUserPayload(up);
+		String predicate = conf.get("Predicate");
+		System.out.println(predicate);
+
+		Predicate<Tuple> p1 = t -> t.getColumnMap().get("ArtNr").equals("1003");
+		Predicate<Tuple> p2 = t -> t.getColumnMap().get("ArtName").equals("Weste");
+		p = p1.or(p2);
+	}
+
+	@Override
+	public void run() throws Exception {
+		Preconditions.checkState(getInputs().size() == 1);
+		Preconditions.checkState(getOutputs().size() == 1);
+
+		KeyValueReader kvReader = (KeyValueReader) getInputs().values().iterator().next().getReader();
+		KeyValueWriter kvWriter = (KeyValueWriter) getOutputs().values().iterator().next().getWriter();
+		while (kvReader.next()) {
+			Tuple tuple = (Tuple) kvReader.getCurrentKey();
+			NullWritable nullValue = NullWritable.get();
+			if (p.test(tuple)) {
+				PrintSelectedTuple(tuple);
+				kvWriter.write(tuple, nullValue);
+
+			}
+
+		}
+	}
+
+	@Override
+	public void initialize() throws Exception {
+		System.out.println("Initialize SelectionProcessor");
+	}
+
+	private static void PrintSelectedTuple(Tuple tuple) {
+		List<String> l = tuple.getAttributeValues();
+		for (String t1 : l) {
+			System.out.print(t1 + "\t");
+		}
+		System.out.println();
+	}
+}

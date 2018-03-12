@@ -1,0 +1,36 @@
+package de.bachd.bigdata;
+
+import org.apache.hadoop.io.Text;
+import org.apache.tez.mapreduce.processor.SimpleMRProcessor;
+import org.apache.tez.runtime.api.ProcessorContext;
+import org.apache.tez.runtime.library.api.KeyValueReader;
+import org.apache.tez.runtime.library.api.KeyValueWriter;
+
+public class TableProcessor extends SimpleMRProcessor {
+
+	public TableProcessor(ProcessorContext context) {
+		super(context);
+		System.out.println(context.getVertexParallelism());
+	}
+
+	@Override
+	public void run() throws Exception {
+		KeyValueReader kvDataReader = (KeyValueReader) getInputs().get(App.DATAINPUT).getReader();
+		KeyValueReader kvSchemeReader = (KeyValueReader) getInputs().get(App.DATAINPUT).getReader();
+		KeyValueWriter kvWriter = (KeyValueWriter) getOutputs().get(App.DATAOUTPUT).getWriter();
+		if (kvReader.next()) {
+			scheme = new Text(kvReader.getCurrentValue().toString());
+		}
+		while (kvReader.next()) {
+			Text row = new Text(kvReader.getCurrentValue().toString());
+			System.out.println(row.toString());
+			kvWriter.write(scheme, row);
+		}
+	}
+
+	@Override
+	public void initialize() throws Exception {
+		System.out.println("Initialize");
+
+	}
+}

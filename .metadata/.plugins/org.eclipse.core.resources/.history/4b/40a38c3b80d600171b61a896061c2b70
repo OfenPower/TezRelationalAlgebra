@@ -1,0 +1,115 @@
+package de.bachd.bigdata;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.tez.common.TezUtils;
+import org.apache.tez.dag.api.UserPayload;
+import org.apache.tez.runtime.api.LogicalInput;
+import org.apache.tez.runtime.api.ProcessorContext;
+import org.apache.tez.runtime.library.api.KeyValueReader;
+import org.apache.tez.runtime.library.api.KeyValueWriter;
+import org.apache.tez.runtime.library.processor.SimpleProcessor;
+
+import com.google.common.base.CharMatcher;
+import com.google.common.base.Splitter;
+
+/**
+ * Der HashJoinProcessor implementiert einen Equi-Join der folgenden Form:
+ * 
+ * "R join S on R.A = S.A
+ *
+ */
+
+public class HashJoinProcessor extends SimpleProcessor {
+
+	private List<String> joinAttributes;
+	private String leftSideRelation;
+	private String leftSideJoinAttribute;
+	private String rightSideRelation;
+	private String rightSideJoinAttribute;
+
+	public HashJoinProcessor(ProcessorContext context) {
+		super(context);
+		joinAttributes = new ArrayList<>();
+	}
+
+	@Override
+	public void run() throws Exception {
+		// KeyValueReader und Writer initialisieren
+		KeyValueReader kvReader1 = null;
+		KeyValueReader kvReader2 = null;
+		Iterator<LogicalInput> kvReaderItr = getInputs().values().iterator();
+		while (kvReaderItr.hasNext()) {
+			kvReader1 = (KeyValueReader) kvReaderItr.next().getReader();
+			kvReader2 = (KeyValueReader) kvReaderItr.next().getReader();
+		}
+		KeyValueWriter kvWriter = (KeyValueWriter) getOutputs().values().iterator().next().getWriter();
+		Map<String, String> joinMap = new HashMap<>();
+
+		// Herausfinden, welcher Reader welche Tupel enthält. Hierzu wird das
+		// erste JoinAttribut der Form "Relation.Column" in "Relation"
+		// gesplittet und mit dem Relationsnamen der Tupels verglichen.
+		// Anschließend wird die HashMap aufgebaut.
+		Iterable<String> joinAttrItr = Splitter.on('.').trimResults().omitEmptyStrings().split(joinAttributes.get(0));
+		Iterator<String> joinAttrIterator = joinAttrItr.iterator();
+
+		while (joinAttrIterator.hasNext()) {
+
+		}
+		String relationName = Splitter.on('.').trimResults().omitEmptyStrings().split(joinAttributes.get(0)).iterator()
+				.next();
+		while (kvReader1.next()) {
+			Tuple t = (Tuple) kvReader1.getCurrentKey();
+			if (relationName.equals(t.getRelationName())) {
+				System.out.println("artikel-Tuple found");
+
+			} else {
+				System.out.println("liegen-Tuple found");
+			}
+
+			System.out.println(t.getColumnValueStringMap().get("ArtNr"));
+		}
+
+		// Alle Tupel aus Reader1 in HashMap schreiben
+
+		/*
+		 * while (kvReader1.next()) { Tuple t = (Tuple)
+		 * kvReader1.getCurrentKey(); NullWritable nullValue =
+		 * NullWritable.get(); kvWriter.write(t, nullValue); }
+		 */
+
+	}
+
+	@Override
+	public void initialize() throws IOException {
+		System.out.println("Initialize HashJoinProcessor");
+		UserPayload up = getContext().getUserPayload();
+		Configuration conf = TezUtils.createConfFromUserPayload(up);
+		String attributes = conf.get("JoinAttribute");
+		// DEBUG: Join anzeigen!
+		System.out.println("Join on: " + attributes);
+		Iterable<String> attrItr = Splitter.on(CharMatcher.anyOf(".").or(CharMatcher.anyOf(" = "))).trimResults()
+				.omitEmptyStrings().split(attributes);
+		Iterator<String> attrIterator = attrItr.iterator();
+		while (attrIterator.hasNext()) {
+			this.leftSideRelation = attrIterator.next();
+			this.leftSideJoinAttribute = attrIterator.next();
+			this.rightSideRelation = attrIterator.next();
+			this.rightSideJoinAttribute = attrIterator.next();
+		}
+
+		// DEBUG: Joinrelationen und Attribute anzeigen lassen
+		//System.out.println("Linke Relation: " + this.leftSideRelation);
+		//System.out.println("Linkes Joinattribut: " + this.leftSideJoinAttribute);
+		//System.out.println("Rechte Relation: " + this.rightSideRelation);
+		//System.out.println("Rechtes Joinattribut: " + this.rightSideJoinAttribute);
+
+	}
+
+}

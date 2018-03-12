@@ -1,0 +1,46 @@
+package de.bachd.bigdata;
+
+import java.util.ArrayList;
+
+import org.apache.tez.mapreduce.processor.SimpleMRProcessor;
+import org.apache.tez.runtime.api.Input;
+import org.apache.tez.runtime.api.LogicalInput;
+import org.apache.tez.runtime.api.ProcessorContext;
+import org.apache.tez.runtime.library.api.KeyValueReader;
+
+public class TableProcessor extends SimpleMRProcessor {
+
+	public TableProcessor(ProcessorContext context) {
+		super(context);
+	}
+
+	@Override
+	public void preOp() throws Exception {
+		super.preOp();
+
+		// Knoten blockieren, solange Schema noch nicht gelesen wurde
+		LogicalInput schemeInput = getInputs().get(App.V2);
+		ArrayList<Input> blockingInputs = new ArrayList<>();
+		blockingInputs.add(schemeInput);
+		getContext().waitForAllInputsReady(blockingInputs);
+	}
+
+	@Override
+	public void run() throws Exception {
+		KeyValueReader kvDataReader = (KeyValueReader) getInputs().get(App.V1).getReader();
+		KeyValueReader kvSchemeReader = (KeyValueReader) getInputs().get(App.V2).getReader();
+		if (kvSchemeReader.next()) {
+			String row = kvSchemeReader.getCurrentValue().toString();
+			System.out.println(row);
+		}
+		while (kvDataReader.next()) {
+			String row = kvDataReader.getCurrentValue().toString();
+			System.out.println(row);
+		}
+	}
+
+	@Override
+	public void initialize() throws Exception {
+		System.out.println("Initialize TableProcessor");
+	}
+}

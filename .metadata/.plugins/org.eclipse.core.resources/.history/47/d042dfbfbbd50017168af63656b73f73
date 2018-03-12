@@ -1,0 +1,90 @@
+package de.bachd.bigdata;
+
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+
+import org.apache.hadoop.io.NullWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.tez.mapreduce.processor.SimpleMRProcessor;
+import org.apache.tez.runtime.api.LogicalInput;
+import org.apache.tez.runtime.api.ProcessorContext;
+import org.apache.tez.runtime.library.api.KeyValueReader;
+import org.apache.tez.runtime.library.api.KeyValueWriter;
+
+import com.google.common.base.Preconditions;
+import com.google.common.base.Splitter;
+
+public class TableProcessor extends SimpleMRProcessor {
+
+	public TableProcessor(ProcessorContext context) {
+		super(context);
+	}
+
+	@Override
+	public void run() throws Exception {
+		Preconditions.checkState(getInputs().size() == 2);
+		Preconditions.checkState(getOutputs().size() == 1);
+		Iterator<LogicalInput> kvReaderItr = getInputs().values().iterator();
+		KeyValueReader kvSchemeReader = null;
+		KeyValueReader kvDataReader = null;
+		KeyValueWriter kvTableWriter = (KeyValueWriter) getOutputs().values().iterator().next().getWriter();
+		while (kvReaderItr.hasNext()) {
+			// erster Mapeintrag ist DATAINPUT, wurde mit .addDataSource()
+			// eingetragen
+			kvDataReader = (KeyValueReader) kvReaderItr.next().getReader();
+			kvSchemeReader = (KeyValueReader) kvReaderItr.next().getReader();
+		}
+		// Schema lesen, Daten lesen, splitten und als Tuple
+		// speichern. Output: (Tuple, Schema)
+		if (kvSchemeReader.next()) {
+			Text scheme = (Text) kvSchemeReader.getCurrentKey();
+			System.out.println(scheme);
+			Iterable<String> schemeValues = Splitter.on('\t').trimResults().omitEmptyStrings().split(scheme.toString());
+			List<Text> attributeNameList = new ArrayList<>(); // Liste aller
+																// Attributnamen
+			List<Text> attributeDomainList = new ArrayList<>(); // Liste aller
+																// Attributdomänen
+
+			// Über alle Attribute des Schemas iterieren, Name und Domain
+			// aufbereiten und in Liste speichern
+			for (String col : schemeValues) {
+				Iterable<String> cols = Splitter.on(':').trimResults().omitEmptyStrings().split(col);
+				Iterator<String> colsItr = cols.iterator();
+				String attributeName = colsItr.next();
+				String attributeDomain = colsItr.next();
+				attributeNameList.add(new Text(attributeName));
+				attributeDomainList.add(new Text(attributeDomain));
+			}
+
+			// Daten aus .csv Datei lesen, aufbereiten und in Liste abspeichern
+			while (kvDataReader.next()) {
+				String row = kvDataReader.getCurrentValue().toString();
+				Iterable<String> values = Splitter.on('\t').trimResults().omitEmptyStrings().split(row);
+				// Liste aller Attributvalues
+				List<Text> attributeValueList = new ArrayList<>();
+				for (String value : values) {
+					attributeValueList.add(new Text(value));
+				}
+				Text[] attributeNames = new Text[attributeNameList.size()];
+				Text[] attributeDomains = new Text[attributeDomainList.size()];
+				Text[] attributeValues = new Text[attributeValueList.size()];
+				attributeNames = attributeNameList.toArray(attributeNames);
+				attributeDomains = attributeDomainList.toArray(attributeDomains);
+				attributeValues = attributeValueList.toArray(attributeValues);
+				// Tuple erzeugen und dort Daten + Columns speichern und
+				// rausschreiben
+				Tuple tuple = new Tuple();
+				tuple.setElements(attributeNames, attributeDomains, attributeValues);
+				NullWritable nullValue = NullWritable.get();
+				kvTableWriter.write(tuple, nullValue);
+			}
+		}
+
+	}
+
+	@Override
+	public void initialize() throws Exception {
+		System.out.println("Initialize TableProcessor");
+	}
+}

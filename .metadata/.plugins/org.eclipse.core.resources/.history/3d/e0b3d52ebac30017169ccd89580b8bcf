@@ -1,0 +1,5 @@
+package de.bachd.bigdata.streams;
+
+public class PeekStream<T> extends Stream<T> {
+	private Applier<T> peeker;
+}

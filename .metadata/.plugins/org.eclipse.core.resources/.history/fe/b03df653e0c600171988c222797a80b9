@@ -1,0 +1,13 @@
+package de.bachd.bigdata;
+
+import org.apache.tez.mapreduce.processor.map.MapProcessor;
+import org.apache.tez.runtime.api.ProcessorContext;
+
+public class CustomInput extends MapProcessor {
+
+	public CustomInput(ProcessorContext processorContext) {
+		super(processorContext);
+		// TODO Auto-generated constructor stub
+	}
+
+}

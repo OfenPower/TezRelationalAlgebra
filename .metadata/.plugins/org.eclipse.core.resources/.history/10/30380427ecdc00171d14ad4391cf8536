@@ -1,0 +1,25 @@
+package de.bachd.bigdata.tez;
+
+import org.apache.tez.runtime.api.ProcessorContext;
+import org.apache.tez.runtime.library.processor.SimpleProcessor;
+
+public class AggregateProjectionProcessor extends SimpleProcessor {
+
+	private boolean receivesGroupedTuples;
+
+	public AggregateProjectionProcessor(ProcessorContext context) {
+		super(context);
+	}
+
+	@Override
+	public void run() throws Exception {
+		// TODO Auto-generated method stub
+
+	}
+
+	@Override
+	public void initialize() throws Exception {
+
+	}
+
+}

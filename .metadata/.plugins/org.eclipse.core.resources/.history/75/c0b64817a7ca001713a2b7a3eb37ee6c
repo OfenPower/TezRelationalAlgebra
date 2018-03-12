@@ -1,0 +1,60 @@
+package de.bachd.bigdata;
+
+import java.util.List;
+import java.util.function.Predicate;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.io.NullWritable;
+import org.apache.tez.common.TezUtils;
+import org.apache.tez.dag.api.UserPayload;
+import org.apache.tez.mapreduce.processor.SimpleMRProcessor;
+import org.apache.tez.runtime.api.ProcessorContext;
+import org.apache.tez.runtime.library.api.KeyValueReader;
+import org.apache.tez.runtime.library.api.KeyValueWriter;
+
+import com.google.common.base.Preconditions;
+
+public class SelectionProcessor extends SimpleMRProcessor {
+
+	private Predicate<Tuple> p;
+
+	public SelectionProcessor(ProcessorContext context) {
+		super(context);
+	}
+
+	@Override
+	public void run() throws Exception {
+		Preconditions.checkState(getInputs().size() == 1);
+		Preconditions.checkState(getOutputs().size() == 1);
+
+		KeyValueReader kvReader = (KeyValueReader) getInputs().values().iterator().next().getReader();
+		KeyValueWriter kvWriter = (KeyValueWriter) getOutputs().values().iterator().next().getWriter();
+		while (kvReader.next()) {
+			Tuple tuple = (Tuple) kvReader.getCurrentKey();
+			NullWritable nullValue = NullWritable.get();
+			if (p.test(tuple)) {
+				kvWriter.write(tuple, nullValue);
+				List<String> l = tuple.getAttributeValues();
+				for (String t1 : l) {
+					System.out.print(t1 + "\t");
+				}
+				System.out.println();
+			}
+
+		}
+	}
+
+	@Override
+	public void initialize() throws Exception {
+		System.out.println("Initialize SelectionProcessor");
+		p = PredicateHolder.getPredicate();
+		if (p != null) {
+			System.out.println("Got Predicate!");
+		}
+
+		UserPayload up = getContext().getUserPayload();
+		Configuration conf = TezUtils.createConfFromUserPayload(up);
+		System.out.println(conf.get("TestKey"));
+
+	}
+}

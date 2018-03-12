@@ -1,0 +1,24 @@
+package de.bachd.bigdata;
+
+import org.apache.tez.mapreduce.processor.SimpleMRProcessor;
+import org.apache.tez.runtime.api.ProcessorContext;
+
+public class ProjectionProcessor extends SimpleMRProcessor {
+
+	private List<String> projectionList;
+
+	public ProjectionProcessor(ProcessorContext context) {
+		super(context);
+	}
+
+	@Override
+	public void run() throws Exception {
+
+	}
+
+	@Override
+	public void initialize() {
+		System.out.println("Initialize ProjectionProcessor");
+	}
+
+}

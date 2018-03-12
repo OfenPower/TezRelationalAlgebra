@@ -1,0 +1,28 @@
+package de.bachd.bigdata;
+
+import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.tez.runtime.api.ProcessorContext;
+import org.apache.tez.runtime.library.api.KeyValueReader;
+import org.apache.tez.runtime.library.api.KeyValueWriter;
+import org.apache.tez.runtime.library.processor.SimpleProcessor;
+
+public class TableProcessor extends SimpleProcessor {
+
+	public TableProcessor(ProcessorContext context) {
+		super(context);
+	}
+
+	@Override
+	public void run() throws Exception {
+		KeyValueReader kvReader = (KeyValueReader) getInputs().get("datainput").getReader();
+		KeyValueWriter kvWriter = (KeyValueWriter) getOutputs().get("v2").getWriter();
+		while (kvReader.next()) {
+			System.out.println("DataProcessor -> next");
+			IntWritable key = new IntWritable(0);
+			Text row = new Text(kvReader.getCurrentValue().toString());
+			kvWriter.write(key, row);
+		}
+	}
+
+}

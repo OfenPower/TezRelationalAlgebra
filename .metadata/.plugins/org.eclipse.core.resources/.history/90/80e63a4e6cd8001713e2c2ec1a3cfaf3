@@ -1,0 +1,165 @@
+package de.bachd.bigdata;
+
+import java.io.IOException;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.conf.Configured;
+import org.apache.hadoop.io.NullWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
+import org.apache.hadoop.util.Tool;
+import org.apache.hadoop.util.ToolRunner;
+import org.apache.tez.client.TezClient;
+import org.apache.tez.common.TezUtils;
+import org.apache.tez.dag.api.DAG;
+import org.apache.tez.dag.api.DataSinkDescriptor;
+import org.apache.tez.dag.api.DataSourceDescriptor;
+import org.apache.tez.dag.api.Edge;
+import org.apache.tez.dag.api.ProcessorDescriptor;
+import org.apache.tez.dag.api.TezConfiguration;
+import org.apache.tez.dag.api.TezException;
+import org.apache.tez.dag.api.UserPayload;
+import org.apache.tez.dag.api.Vertex;
+import org.apache.tez.dag.api.client.DAGClient;
+import org.apache.tez.dag.api.client.DAGStatus;
+import org.apache.tez.mapreduce.input.MRInput;
+import org.apache.tez.mapreduce.output.MROutput;
+import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
+import org.apache.tez.runtime.library.conf.UnorderedKVEdgeConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Hello World!
+ *
+ */
+public class App extends Configured implements Tool {
+
+	public static final String ARTIKELDATAINPUT = "ArtikelDataInput";
+	public static final String ARTIKELSCHEMEINPUT = "ArtikelSchemeInput";
+	public static final String LIEGENDATAINPUT = "LiegenDataInput";
+	public static final String LIEGENSCHEMEINPUT = "LiegenSchemeInput";
+	public static final String RESULTOUTPUT = "ResultOutput";
+	public static final String ARTIKELTABLEPROCESSOR = "ArtikelTableProcessor";
+	public static final String ARTIKELSCHEMEPROCESSOR = "ArtikelSchemeProcessor";
+	public static final String LIEGENTABLEPROCESSOR = "LiegenTableProcessor";
+	public static final String LIEGENSCHEMEPROCESSOR = "LiegenSchemeProcessor";
+	public static final String HASHJOINPROCESSOR = "HashJoinProcessor";
+	public static final String SELECTIONPROCESSOR = "SelectionProcessor";
+	public static final String PROJECTIONPROCESSOR = "ProjectionProcessor";
+
+	private static final Logger LOG = LoggerFactory.getLogger(App.class);
+
+	@Override
+	public int run(String[] args) throws Exception {
+		// Tez lokal aufsetzen
+		TezConfiguration tezConf = new TezConfiguration(getConf());
+		tezConf.setBoolean(TezConfiguration.TEZ_LOCAL_MODE, true);
+		tezConf.set("fs.default.name", "file:///");
+		tezConf.setBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH, true);
+
+		// TezClient starten
+		TezClient tezClient = TezClient.create("TezClient", tezConf);
+		tezClient.start();
+
+		return runJob(args, tezConf, tezClient);
+	}
+
+	private int runJob(String[] args, TezConfiguration tezConf, TezClient tezClient) throws TezException, IOException {
+
+		// Name der Relationen aus args[] entnehmen
+		String r1 = "artikel";
+		String r2 = "liegen";
+
+		// DataSource und DataSinks erzeugen
+		DataSourceDescriptor dataSource1 = MRInput
+				.createConfigBuilder(new Configuration(tezConf), TextInputFormat.class, r1 + ".csv").build();
+		DataSourceDescriptor schemeSource1 = MRInput
+				.createConfigBuilder(new Configuration(tezConf), TextInputFormat.class, r1 + ".scheme").build();
+		DataSourceDescriptor dataSource2 = MRInput
+				.createConfigBuilder(new Configuration(tezConf), TextInputFormat.class, r2 + ".csv").build();
+		DataSourceDescriptor schemeSource2 = MRInput
+				.createConfigBuilder(new Configuration(tezConf), TextInputFormat.class, r2 + ".scheme").build();
+		DataSinkDescriptor dataSink = MROutput
+				.createConfigBuilder(new Configuration(tezConf), TextOutputFormat.class, "output.csv").build();
+
+		// Parameter für Selektion/Projektion an Configuration übergeben, um
+		// diese später an die jeweiligen Prozessoren schicken zu können
+		String selectionPredicate = "ArtPreis <= 29.99";
+		// String projection = "*";
+		String projection = "ArtName, ArtPreis, liegen.ArtNr, LagerNr, Bestand";
+		// String projection = "artikel.ArtNr, ArtName, ArtPreis, LagerNr,
+		// Bestand";
+		Configuration parameterConf = new Configuration();
+		parameterConf.set("SelectionPredicate", selectionPredicate);
+		parameterConf.set("Projection", projection);
+		UserPayload parameter = TezUtils.createUserPayloadFromConf(parameterConf);
+		// Je ein Configurationsobjekt pro JoinProcessor erzeugen und dort die
+		// JoinAttribute für Equi-Joins speichern
+		String joinAttribute = "artikel.ArtNr = liegen.ArtNr";
+		Configuration joinConf = new Configuration();
+		joinConf.set("JoinAttribute", joinAttribute);
+		UserPayload joinParameter = TezUtils.createUserPayloadFromConf(joinConf);
+
+		// Knoten erzeugen. Prädikat und Projectionattribute über UserPayload
+		// als String an SelectionProcessor und ProjectionProcessor
+		// weiterreichen
+		Vertex v1 = Vertex.create(ARTIKELSCHEMEPROCESSOR, ProcessorDescriptor.create(SchemeProcessor.class.getName()));
+		Vertex v2 = Vertex.create(ARTIKELTABLEPROCESSOR, ProcessorDescriptor.create(TableProcessor.class.getName()));
+		Vertex v3 = Vertex.create(LIEGENSCHEMEPROCESSOR, ProcessorDescriptor.create(SchemeProcessor.class.getName()));
+		Vertex v4 = Vertex.create(LIEGENTABLEPROCESSOR, ProcessorDescriptor.create(TableProcessor.class.getName()));
+		Vertex v5 = Vertex.create(HASHJOINPROCESSOR,
+				ProcessorDescriptor.create(HashJoinProcessor.class.getName()).setUserPayload(joinParameter), 1);
+		Vertex v6 = Vertex.create(SELECTIONPROCESSOR,
+				ProcessorDescriptor.create(SelectionProcessor.class.getName()).setUserPayload(parameter), 1);
+		Vertex v7 = Vertex.create(PROJECTIONPROCESSOR,
+				ProcessorDescriptor.create(ProjectionProcessor.class.getName()).setUserPayload(parameter), 1);
+		v1.addDataSource(ARTIKELSCHEMEINPUT, schemeSource1);
+		v2.addDataSource(ARTIKELDATAINPUT, dataSource1);
+		v3.addDataSource(LIEGENSCHEMEINPUT, schemeSource2);
+		v4.addDataSource(LIEGENDATAINPUT, dataSource2);
+		v7.addDataSink(RESULTOUTPUT, dataSink);
+
+		// Edges erzeugen:
+		UnorderedKVEdgeConfig eConfig1 = UnorderedKVEdgeConfig.newBuilder(Text.class.getName(), Text.class.getName())
+				.setFromConfiguration(tezConf).build();
+		Edge e1 = Edge.create(v1, v2, eConfig1.createDefaultBroadcastEdgeProperty());
+		Edge e2 = Edge.create(v3, v4, eConfig1.createDefaultBroadcastEdgeProperty());
+		UnorderedKVEdgeConfig eConfig2 = UnorderedKVEdgeConfig
+				.newBuilder(Tuple.class.getName(), NullWritable.class.getName()).setFromConfiguration(tezConf).build();
+		Edge e3 = Edge.create(v2, v5, eConfig2.createDefaultBroadcastEdgeProperty());
+		Edge e4 = Edge.create(v4, v5, eConfig2.createDefaultBroadcastEdgeProperty());
+		Edge e5 = Edge.create(v5, v6, eConfig2.createDefaultBroadcastEdgeProperty());
+		Edge e6 = Edge.create(v6, v7, eConfig2.createDefaultBroadcastEdgeProperty());
+
+		// Graph aufbauen und starten
+		DAG dag = DAG.create("dag");
+		dag.addVertex(v1).addVertex(v2).addVertex(v3).addVertex(v4).addVertex(v5).addVertex(v6).addVertex(v7)
+				.addEdge(e1).addEdge(e2).addEdge(e3).addEdge(e4).addEdge(e5).addEdge(e6);
+
+		// dag.addVertex(v1).addVertex(v2).addVertex(v5).addVertex(v6).addVertex(v7).addEdge(e1).addEdge(e3).addEdge(e5)
+		// .addEdge(e6);
+
+		// Edge testEdge = Edge.create(v2, v6,
+		// eConfig2.createDefaultBroadcastEdgeProperty());
+		// dag.addVertex(v1).addVertex(v2).addVertex(v6).addVertex(v7).addEdge(e1).addEdge(testEdge).addEdge(e6);
+
+		System.out.println("Start DAG");
+		DAGClient dagClient = tezClient.submitDAG(dag);
+		try {
+			DAGStatus dagStatus;
+			dagStatus = dagClient.waitForCompletionWithStatusUpdates(null);
+			System.out.println("DAG diagnostics: " + dagStatus.getDiagnostics());
+		} catch (InterruptedException ex) {
+			ex.printStackTrace();
+		}
+
+		return 0;
+	}
+
+	public static void main(String[] args) throws Exception {
+		LOG.info("Start App");
+		ToolRunner.run(new Configuration(), new App(), args);
+	}
+}

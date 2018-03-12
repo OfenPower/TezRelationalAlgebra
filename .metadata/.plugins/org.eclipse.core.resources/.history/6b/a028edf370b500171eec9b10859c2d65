@@ -1,0 +1,64 @@
+package de.bachd.bigdata;
+
+import java.util.List;
+import java.util.Map;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.tez.dag.api.DAG;
+import org.apache.tez.dag.api.ProcessorDescriptor;
+import org.apache.tez.dag.api.TezConfiguration;
+import org.apache.tez.dag.api.Vertex;
+import org.apache.tez.runtime.api.AbstractLogicalIOProcessor;
+import org.apache.tez.runtime.api.Event;
+import org.apache.tez.runtime.api.LogicalInput;
+import org.apache.tez.runtime.api.LogicalOutput;
+import org.apache.tez.runtime.api.ProcessorContext;
+import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
+
+public class App {
+
+	public static class Processor extends AbstractLogicalIOProcessor {
+
+		public Processor(ProcessorContext context) {
+			super(context);
+			// TODO Auto-generated constructor stub
+		}
+
+		public void run(Map<String, LogicalInput> arg0, Map<String, LogicalOutput> arg1) throws Exception {
+			// TODO Auto-generated method stub
+			
+		}
+
+		public void close() throws Exception {
+			// TODO Auto-generated method stub
+			
+		}
+
+		public void handleEvents(List<Event> arg0) {
+			// TODO Auto-generated method stub
+			
+		}
+
+		@Override
+		public void initialize() throws Exception {
+			// TODO Auto-generated method stub
+			
+		}
+		
+	}
+	
+	
+	public static void main(String[] args) {
+		Configuration conf = new Configuration();
+		conf.setBoolean(TezConfiguration.TEZ_LOCAL_MODE, true);
+		conf.set("fs.default.name", "file:///");
+		conf.setBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH, true);
+		
+		System.out.println();
+		System.out.println("Hallo Welt");
+		
+		DAG dag = DAG.create("SumDAG");
+		Vertex vertex = Vertex.create("SumVertex", ProcessorDescriptor.create("App.Processor"));
+	}
+
+}

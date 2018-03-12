@@ -1,0 +1,98 @@
+package de.bachd.bigdata;
+
+import java.io.DataInput;
+import java.io.DataOutput;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.hadoop.io.ArrayWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.io.Writable;
+import org.apache.hadoop.io.WritableComparable;
+
+public class Tuple implements WritableComparable<Tuple> {
+
+	private ArrayWritable attributeNames;
+	private ArrayWritable attributeDomains;
+	private ArrayWritable attributeValues;
+
+	public Tuple() {
+		attributeNames = new ArrayWritable(Text.class);
+		attributeDomains = new ArrayWritable(Text.class);
+		attributeValues = new ArrayWritable(Text.class);
+	}
+
+	public void setElements(Text[] attributeNames, Text[] attributeDomains, Text[] attributeValues) {
+		this.attributeNames.set(attributeNames);
+		this.attributeDomains.set(attributeDomains);
+		this.attributeValues.set(attributeValues);
+	}
+
+	public List<Text> getAttributeNames() {
+		// Text-Elemente einzeln casten, da von Writable[] nicht auf
+		// List<Text> gecastet werden kann
+		Writable[] w = this.attributeNames.get();
+		ArrayList<Text> t = new ArrayList<>();
+		for (int i = 0; i < w.length; i++) {
+			t.add((Text) w[i]);
+		}
+		return t;
+	}
+
+	public List<Text> getAttributeDomains() {
+		// Text-Elemente einzeln casten, da von Writable[] nicht auf
+		// List<Text> gecastet werden kann
+		Writable[] w = this.attributeDomains.get();
+		ArrayList<Text> t = new ArrayList<>();
+		for (int i = 0; i < w.length; i++) {
+			t.add((Text) w[i]);
+		}
+		return t;
+	}
+
+	public List<Text> getAttributeValues() {
+		// Text-Elemente einzeln casten, da von Writable[] nicht auf
+		// List<Text> gecastet werden kann
+		Writable[] w = this.attributeValues.get();
+		ArrayList<Text> t = new ArrayList<>();
+		for (int i = 0; i < w.length; i++) {
+			t.add((Text) w[i]);
+		}
+		return t;
+	}
+
+	public Map<Text, Text> getColumnMap() {
+		List<Text> columns = getAttributeNames();
+		List<Text> values = getAttributeValues();
+		Map<Text, Text> map = new HashMap<>();
+		for (Text col : columns) {
+			for (Text val : values) {
+				map.put(col, val);
+			}
+		}
+		return map;
+	}
+
+	@Override
+	public void readFields(DataInput in) throws IOException {
+		attributeNames.readFields(in);
+		attributeDomains.readFields(in);
+		attributeValues.readFields(in);
+	}
+
+	@Override
+	public void write(DataOutput out) throws IOException {
+		attributeNames.write(out);
+		attributeDomains.write(out);
+		attributeValues.write(out);
+	}
+
+	@Override
+	public int compareTo(Tuple obj) {
+		return 0;
+	}
+
+}

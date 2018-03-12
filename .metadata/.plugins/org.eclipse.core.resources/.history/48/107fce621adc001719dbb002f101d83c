@@ -1,0 +1,24 @@
+package de.bachd.bigdata;
+
+import org.apache.tez.runtime.api.ProcessorContext;
+import org.apache.tez.runtime.library.api.KeyValueReader;
+import org.apache.tez.runtime.library.processor.SimpleProcessor;
+
+public class GroupByProcessor extends SimpleProcessor {
+
+	public GroupByProcessor(ProcessorContext context) {
+		super(context);
+		// TODO Auto-generated constructor stub
+	}
+
+	@Override
+	public void run() throws Exception {
+		KeyValueReader kvReader = (KeyValueReader) getInputs().values().iterator().next().getReader();
+	}
+
+	@Override
+	public void initialize() {
+		System.out.println("Initialize GroupByProcessor");
+	}
+
+}

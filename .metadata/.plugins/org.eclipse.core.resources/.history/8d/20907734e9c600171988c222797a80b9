@@ -1,0 +1,7 @@
+package de.bachd.bigdata;
+
+import org.apache.hadoop.io.WritableComparable;
+
+public class Tuple implements WritableComparable<Tuple> {
+
+}

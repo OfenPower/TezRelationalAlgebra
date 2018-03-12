@@ -1,0 +1,9 @@
+de/bachd/bigdata/WordCount.class
+de/bachd/bigdata/Query.class
+de/bachd/bigdata/WordCount$TokenProcessor.class
+de/bachd/bigdata/WordCount$SumProcessor.class
+de/bachd/bigdata/App.class
+de/bachd/bigdata/QueryBuilder.class
+de/bachd/bigdata/App$TestProcessor.class
+de/bachd/bigdata/QueryNode.class
+de/bachd/bigdata/TezExampleBase.class
