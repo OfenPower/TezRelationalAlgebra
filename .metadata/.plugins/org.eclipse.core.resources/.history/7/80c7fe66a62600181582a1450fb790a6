@@ -1,0 +1,100 @@
+package de.bachd.bigdata.tez;
+
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.conf.Configured;
+import org.apache.hadoop.util.Tool;
+import org.apache.hadoop.util.ToolRunner;
+import org.apache.tez.client.TezClient;
+import org.apache.tez.dag.api.DAG;
+import org.apache.tez.dag.api.TezConfiguration;
+import org.apache.tez.dag.api.TezException;
+import org.apache.tez.dag.api.client.DAGClient;
+import org.apache.tez.dag.api.client.DAGStatus;
+import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
+
+/**
+ * Hello World!
+ *
+ */
+public class Main extends Configured implements Tool {
+
+	public static final String ARTIKELDATAINPUT = "ArtikelDataInput";
+	public static final String ARTIKELSCHEMEINPUT = "ArtikelSchemeInput";
+	public static final String LIEGENDATAINPUT = "LiegenDataInput";
+	public static final String LIEGENSCHEMEINPUT = "LiegenSchemeInput";
+	public static final String RESULTOUTPUT = "ResultOutput";
+	public static final String ARTIKELTABLEPROCESSOR = "ArtikelTableProcessor";
+	public static final String ARTIKELSCHEMEPROCESSOR = "ArtikelSchemeProcessor";
+	public static final String LIEGENTABLEPROCESSOR = "LiegenTableProcessor";
+	public static final String LIEGENSCHEMEPROCESSOR = "LiegenSchemeProcessor";
+	public static final String HASHJOINPROCESSOR = "HashJoinProcessor";
+	public static final String SELECTIONPROCESSOR = "SelectionProcessor";
+	public static final String GROUPBYPROCESSOR = "GroupByProcessor";
+	public static final String PROJECTIONPROCESSOR = "ProjectionProcessor";
+	public static final String AGGREGATIONPROCESSOR = "AggregationProcessor";
+
+	@Override
+	public int run(String[] args) throws Exception {
+		// Tez lokal aufsetzen
+		TezConfiguration tezConf = new TezConfiguration();
+		tezConf.setBoolean(TezConfiguration.TEZ_LOCAL_MODE, true);
+		tezConf.set("fs.default.name", "file:///");
+		tezConf.setBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH, true);
+		// tezConf.set(TezRuntimeConfiguration.TEZ_RUNTIME_KEY_CLASS,
+		// Tuple.class.getName());
+		// tezConf.set(TezRuntimeConfiguration.TEZ_RUNTIME_VALUE_CLASS,
+		// NullWritable.class.getName());
+
+		// Query aus angegebener Datei in einen String auslesen
+		String query = null;
+		StringBuilder sb = new StringBuilder();
+		String fileName = "./querys/" + args[0];
+		try (FileReader fin = new FileReader(new File(fileName)); BufferedReader br = new BufferedReader(fin)) {
+			String line;
+			while ((line = br.readLine()) != null) {
+				sb.append(line + "\n");
+			}
+		}
+		query = sb.toString();
+		// System.out.println(query);
+
+		// DAG aus String erzeugen
+		DAG dag = DAGBuilder.buildDAGFromString(query, tezConf);
+		DAG dag2 = DAGTestBuilder.buildFullDAG(tezConf);
+
+		// TezClient starten
+		TezClient tezClient = TezClient.create("TezClient", tezConf);
+		tezClient.start();
+
+		// return 0;
+		return runJob(dag2, tezConf, tezClient);
+	}
+
+	private int runJob(DAG dag, TezConfiguration tezConf, TezClient tezClient) throws TezException, IOException {
+
+		System.out.println("Start DAG");
+		try {
+			DAGClient dagClient = tezClient.submitDAG(dag);
+			DAGStatus dagStatus;
+			dagStatus = dagClient.waitForCompletionWithStatusUpdates(null);
+			System.out.println("DAG diagnostics: " + dagStatus.getDiagnostics());
+		} catch (InterruptedException ex) {
+			ex.printStackTrace();
+		}
+
+		return 0;
+	}
+
+	public static void main(String[] args) throws Exception {
+		if (args.length != 1) {
+			System.out.println("Too many arguments! Enter only one .sql file (e.g. query01.sql)");
+		} else {
+			ToolRunner.run(new Configuration(), new Main(), args);
+		}
+	}
+}

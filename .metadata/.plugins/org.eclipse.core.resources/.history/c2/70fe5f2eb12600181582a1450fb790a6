@@ -1,0 +1,174 @@
+package de.bachd.bigdata.tez;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Queue;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.tez.common.TezUtils;
+import org.apache.tez.dag.api.DAG;
+import org.apache.tez.dag.api.DataSourceDescriptor;
+import org.apache.tez.dag.api.TezConfiguration;
+import org.apache.tez.dag.api.TezException;
+import org.apache.tez.dag.api.UserPayload;
+
+import com.google.common.base.CharMatcher;
+import com.google.common.base.Splitter;
+import com.google.common.collect.Lists;
+
+public class DAGBuilder {
+
+	UserPayload projectionParameter;
+	UserPayload selectionParameter;
+	UserPayload tableParameter;
+	List<String> dataSourceList = new ArrayList<>(); // speichert Namen der
+														// Relationen
+	List<DataSourceDescriptor> dataSourceDescriptorList = new ArrayList<>();
+
+	public DAG buildDAGFromString(String query, TezConfiguration tezConf) throws TezException, IOException {
+		initializeUserPayloads(query);
+
+		return null;
+	}
+
+	private void initializeUserPayloads(String query) throws TezException, IOException {
+		List<String> queryParts = Lists.newArrayList(Splitter.on("\n").trimResults().omitEmptyStrings().split(query));
+		for (String s : queryParts) {
+			if (s.startsWith("SELECT")) {
+				setProjectionAndAggregationPayload(s);
+			}
+			if (s.startsWith("FROM")) {
+				setTablePayload(s);
+			}
+			if (s.startsWith("WHERE")) {
+				setSelectionPayload(s);
+			}
+		}
+	}
+
+	private void setProjectionAndAggregationPayload(String queryPart) throws IOException {
+		System.out.println("---- setProjectionAndAggregationConfiguration ----");
+		// SELECT-wort abschneiden
+		String projectionString = queryPart.substring(7);
+		System.out.println(projectionString);
+		Configuration conf = new Configuration();
+		conf.set("Projection", projectionString);
+		this.projectionParameter = TezUtils.createUserPayloadFromConf(conf);
+	}
+
+	private void setTablePayload(String queryPart) throws IOException {
+		System.out.println("---- setTableConfiguration ----");
+		List<String> queryParts = Lists
+				.newArrayList(Splitter.on(' ').trimResults().omitEmptyStrings().split(queryPart));
+		for (String s : queryParts) {
+			System.out.print(s + " ");
+		}
+		System.out.println();
+		// Name der Source-Relation speichern
+		this.dataSourceList.add(queryParts.get(1));
+		// Muss eine Relation umbenannt werden?
+		Configuration conf = new Configuration();
+		if (queryParts.size() == 3) {
+			// queryPart hat folgende Form: FROM <table> <newTableName>
+			conf.set("NewRelationRename", queryParts.get(2));
+		} else {
+			// queryPart hat folgende Form: FROM <table>
+			// => Keine Umbennenung nötig
+			conf.set("NewRelationRename", "");
+		}
+		this.tableParameter = TezUtils.createUserPayloadFromConf(conf);
+	}
+
+	private void setSelectionPayload(String queryPart) throws IOException {
+		System.out.println("---- setSelectionConfiguration ----");
+		// WHERE-wort abschneiden
+		String selectionString = queryPart.substring(6);
+		System.out.println(selectionString);
+		Configuration conf = new Configuration();
+		conf.set("SelectionPredicate", selectionString);
+		this.selectionParameter = TezUtils.createUserPayloadFromConf(conf);
+	}
+
+	/*
+	 * private void setGroupByConfiguration(String queryPart) {
+	 * System.out.println("---- setGroupByConfiguration ----"); List<String>
+	 * queryParts = Lists .newArrayList(Splitter.on('
+	 * ').trimResults().omitEmptyStrings().limit(3).split(queryPart));
+	 * System.out.println(queryParts.get(2));
+	 * this.groupByConfiguration.set("GroupByAttributes", queryParts.get(2)); }
+	 */
+
+	private void aggregate() {
+		// AggregationConfiguration
+		//
+		List<String> queryParts02 = Lists.newArrayList(Splitter.on(CharMatcher.anyOf(" ").or(CharMatcher.anyOf(", ")))
+				.trimResults().omitEmptyStrings().split("queryPart"));
+		// Aggregatfunktionen im SELECT-Statement erkennt man an einer öffnenden
+		// Klammer!
+		StringBuilder sb = new StringBuilder();
+		for (int i = 1; i < queryParts02.size(); i++) {
+			if (queryParts02.get(i).contains("(")) {
+				sb.append(queryParts02.get(i));
+				sb.append(", ");
+			}
+		}
+		sb.delete(sb.length() - 2, sb.length());
+		System.out.println(sb.toString());
+		// this.aggregationParameter.set("AggregateFunctions", sb.toString());
+	}
+
+	private void deprecatedFunction() {
+		// Query in 5 Bestandteile aufsplitten:
+		// -------------------------------------
+		// SELECT a, b, f(c)
+		// FROM r JOIN s ON r.a = s.a
+		// [...]
+		// WHERE P1
+		// GROUP BY a, b
+		// -------------------------------------
+
+		System.out.println("----------QueueStart----------");
+		Queue<String> queryPartQueue = null;
+		// Queues.newArrayDeque(Splitter.on('\n').trimResults().omitEmptyStrings().split(query));
+		while (!queryPartQueue.isEmpty()) {
+			String queryPart = queryPartQueue.poll();
+			// PROJEKTION
+			if (queryPart.startsWith("SELECT")) {
+				// setProjectionAndAggregationConfiguration(queryPart);
+			}
+
+			// FROM
+
+			// JOIN
+
+			// SELEKTION
+			if (queryPart.startsWith("WHERE")) {
+				// setSelectionConfiguration(queryPart);
+			}
+
+			// GROUP BY
+
+		}
+		System.out.println("----------QueueEnd----------");
+
+		// List<String> queryParts =
+		// Lists.newArrayList(Splitter.on('\n').trimResults().omitEmptyStrings().split(query));
+		// for (int i = 0; i < queryParts.size(); i++) {
+		// System.out.println(queryParts.get(i));
+		// if (!queryParts.get(0).startsWith("SELECT")) {
+		// throw new IllegalArgumentException("query muss mit SELECT
+		// beginnen!");
+		// } else {
+		// setProjectionAndAggregationConfiguration(queryParts.get(0));
+		// }
+		// }
+
+		// setProjectionAndAggregationConfiguration(queryParts.get(0));
+		// setSelectionConfiguration(queryParts.get(3));
+		// setGroupByConfiguration(queryParts.get(4));
+
+		// return 0;
+	}
+
+}

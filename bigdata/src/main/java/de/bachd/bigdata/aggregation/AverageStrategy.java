@@ -34,7 +34,7 @@ public class AverageStrategy implements AggregationStrategy {
 
 	@Override
 	public String getResultDomain() {
-		return "Double";
+		return "double";
 	}
 
 }

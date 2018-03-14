@@ -47,7 +47,7 @@ public class HashJoinProcessor extends SimpleProcessor {
 		// Alle Tupel der linken Join-Relation in die Hashmap laden
 		while (kvReader1.next()) {
 			Tuple tuple = (Tuple) kvReader1.getCurrentKey();
-			String value = tuple.getColumnStringMap().get(this.leftSideJoinAttribute);
+			String value = tuple.getNamesValuesMap().get(this.leftSideJoinAttribute);
 
 			// Tupleobjekt kopieren und in Multimap laden
 			// key = joinattribut, value = kopiertes Tuple, welches in Liste
@@ -66,7 +66,7 @@ public class HashJoinProcessor extends SimpleProcessor {
 			Tuple rightTuple = (Tuple) kvReader2.getCurrentKey();
 			// Multimap besteht aus Listen von leftSide-Tupeln =>
 			// rightSideJoinAttribute zum Zugriff auf Attribute benutzen
-			String joinAttribute = rightTuple.getColumnStringMap().get(this.rightSideJoinAttribute);
+			String joinAttribute = rightTuple.getNamesValuesMap().get(this.rightSideJoinAttribute);
 			// Kommt joinAttribute in HashMap vor?
 			if (joinMultimap.containsKey(joinAttribute)) {
 				// => rightTuple mit allen gemappten leftTuple joinen!

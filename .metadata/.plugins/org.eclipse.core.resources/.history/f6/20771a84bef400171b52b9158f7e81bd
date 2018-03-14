@@ -1,7 +1,0 @@
-package de.bachd.bigdata.tez;
-
-import org.apache.tez.runtime.api.AbstractLogicalInput;
-
-public class InputTest extends AbstractLogicalInput {
-
-}

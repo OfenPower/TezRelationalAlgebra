@@ -31,7 +31,7 @@ public class CountStrategy implements AggregationStrategy {
 
 	@Override
 	public String getResultDomain() {
-		return "Integer";
+		return "integer";
 	}
 
 }

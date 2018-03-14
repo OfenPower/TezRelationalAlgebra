@@ -11,7 +11,6 @@ import org.apache.hadoop.io.Text;
 import org.apache.tez.common.TezUtils;
 import org.apache.tez.dag.api.UserPayload;
 import org.apache.tez.mapreduce.processor.SimpleMRProcessor;
-import org.apache.tez.runtime.api.Event;
 import org.apache.tez.runtime.api.ProcessorContext;
 import org.apache.tez.runtime.library.api.KeyValueReader;
 import org.apache.tez.runtime.library.api.KeyValueWriter;
@@ -22,57 +21,92 @@ import com.google.common.base.Splitter;
  * Erhält Tuple und projeziert diese auf angegebene Attribute. Schreibt Die
  * Ergebniswerte als Datei raus.
  * 
+ * ToDo: Auf "*" prüfen!
+ * 
  */
 public class ProjectionProcessor extends SimpleMRProcessor {
 
-	private List<String> projectionList;
+	private List<String> projectionList = new ArrayList<>();
 
 	public ProjectionProcessor(ProcessorContext context) {
 		super(context);
-		projectionList = new ArrayList<>();
 	}
 
 	@Override
 	public void run() throws Exception {
+		if (projectionList.contains("*")) {
+			// SELECT * FROM
+			projectAllValues();
+		} else {
+			// SELECT a, b FROM
+			projectCertainValues();
+		}
+	}
+
+	private void projectAllValues() throws Exception {
 		KeyValueReader kvReader = (KeyValueReader) getInputs().values().iterator().next().getReader();
-		// KeyValueWriter kvWriter = (KeyValueWriter)
-		// getOutputs().values().iterator().next().getWriter();
-		KeyValueWriter kvWriter = (KeyValueWriter) getOutputs().get("ResultOutput").getWriter();
-		KeyValueWriter kvWriter2 = (KeyValueWriter) getOutputs().get("ResultOutput2").getWriter();
+		KeyValueWriter tableWriter = (KeyValueWriter) getOutputs().get("OutputTable").getWriter();
+		KeyValueWriter schemeWriter = (KeyValueWriter) getOutputs().get("OutputScheme").getWriter();
+		List<String> attributeNames = new ArrayList<>();
+		List<String> attributeDomains = new ArrayList<>();
+		boolean schemeRead = false;
 		while (kvReader.next()) {
 			Tuple tuple = (Tuple) kvReader.getCurrentKey();
-			Text projectedValues = null;
-			// SELECT * FROM
-			// tuple.printColumnValues();
-			if (projectionList.contains("*")) {
-				// Alle Values rausschreiben
-				List<String> valueList = tuple.getAttributeValues();
-				StringBuilder values = new StringBuilder("");
-				for (int i = 0; i < valueList.size(); i++) {
-					values.append(valueList.get(i)).append("\t");
-				}
-				projectedValues = new Text(values.toString());
-			} else {
-				// SELECT a, b FROM
-				// tuple.printColumnValues();
-				Map<String, String> columnMap = tuple.getColumnStringMap();
-				StringBuilder values = new StringBuilder("");
-				for (int i = 0; i < projectionList.size(); i++) {
-					// Projektionsattribut aus Liste holen
-					String column = projectionList.get(i);
-					// Nur Value für dieses Attribut rausschreiben
-					values.append(columnMap.get(column)).append("\t");
-				}
-				// values.delete(values.length() - 2, values.length());
-				projectedValues = new Text(values.toString());
+			if (!schemeRead) { // Schema einmalig speichern
+				attributeNames = tuple.getAttributeNames();
+				attributeDomains = tuple.getAttributeDomains();
+				schemeRead = true;
 			}
-			// Projezierte Tupel rausschreiben
-			NullWritable nullValue = NullWritable.get();
-			kvWriter.write(projectedValues, nullValue);
-
+			// Alle Values rausschreiben
+			List<String> valueList = tuple.getAttributeValues();
+			StringBuilder values = new StringBuilder("");
+			for (int i = 0; i < valueList.size(); i++) {
+				values.append(valueList.get(i)).append("\t");
+			}
+			tableWriter.write(new Text(values.toString()), NullWritable.get());
 		}
 
-		kvWriter2.write(new Text("v1.Vorgänger:Integer"), NullWritable.get());
+		// Ergebnisschema rausschreiben
+		StringBuilder sb = new StringBuilder();
+		for (int i = 0; i < attributeNames.size(); i++) {
+			sb.append(attributeNames.get(i) + ":" + attributeDomains.get(i) + "\t");
+		}
+		schemeWriter.write(new Text(sb.toString()), NullWritable.get());
+	}
+
+	private void projectCertainValues() throws Exception {
+		KeyValueReader kvReader = (KeyValueReader) getInputs().values().iterator().next().getReader();
+		KeyValueWriter tableWriter = (KeyValueWriter) getOutputs().get("OutputTable").getWriter();
+		KeyValueWriter schemeWriter = (KeyValueWriter) getOutputs().get("OutputScheme").getWriter();
+		List<String> projectedAttributeNames = new ArrayList<>();
+		List<String> projectedAttributeDomains = new ArrayList<>();
+		boolean schemeRead = false; // für Schemaspeicherung
+		while (kvReader.next()) {
+			Tuple tuple = (Tuple) kvReader.getCurrentKey();
+			Map<String, String> namesValuesMap = tuple.getNamesValuesMap();
+			Map<String, String> namesDomainsMap = tuple.getNamesDomainsMap();
+			StringBuilder values = new StringBuilder("");
+			for (int i = 0; i < projectionList.size(); i++) {
+				// Projektionsattribut aus Liste holen. Nur Value für dieses
+				// Attribut speichern
+				String column = projectionList.get(i);
+				values.append(namesValuesMap.get(column)).append("\t");
+				// Schema (einmalig) projezieren
+				if (!schemeRead) {
+					projectedAttributeNames.add(column);
+					projectedAttributeDomains.add(namesDomainsMap.get(column));
+				}
+			}
+			schemeRead = true;
+			tableWriter.write(new Text(values.toString()), NullWritable.get());
+		}
+
+		// Ergebnisschema rausschreiben
+		StringBuilder sb = new StringBuilder();
+		for (int i = 0; i < projectedAttributeNames.size(); i++) {
+			sb.append(projectedAttributeNames.get(i) + ":" + projectedAttributeDomains.get(i) + "\t");
+		}
+		schemeWriter.write(new Text(sb.toString()), NullWritable.get());
 	}
 
 	@Override
@@ -93,9 +127,55 @@ public class ProjectionProcessor extends SimpleMRProcessor {
 		System.out.println("Projektion auf: " + projection);
 	}
 
-	@Override
-	public void handleEvents(List<Event> processorEvents) {
+	private void backup() throws Exception {
+		KeyValueReader kvReader = (KeyValueReader) getInputs().values().iterator().next().getReader();
+		KeyValueWriter tableWriter = (KeyValueWriter) getOutputs().get("OutputTable").getWriter();
+		KeyValueWriter schemeWriter = (KeyValueWriter) getOutputs().get("OutputScheme").getWriter();
+		while (kvReader.next()) {
+			Tuple tuple = (Tuple) kvReader.getCurrentKey();
+			// Schema einmalig merken (wird am Ende rausgeschrieben)
+			// if (!schemeRead) {
+			// attributeNames = tuple.getAttributeNames();
+			// attributeDomains = tuple.getAttributeDomains();
+			// schemeRead = true;
+			// }
+			Text projectedValues = null;
+			// SELECT * FROM
+			// tuple.printColumnValues();
+			if (projectionList.contains("*")) {
+				// Alle Values rausschreiben
+				List<String> valueList = tuple.getAttributeValues();
+				StringBuilder values = new StringBuilder("");
+				for (int i = 0; i < valueList.size(); i++) {
+					values.append(valueList.get(i)).append("\t");
+				}
+				projectedValues = new Text(values.toString());
+			} else {
+				// SELECT a, b FROM
+				// tuple.printColumnValues();
+				Map<String, String> columnMap = tuple.getNamesValuesMap();
+				StringBuilder values = new StringBuilder("");
+				for (int i = 0; i < projectionList.size(); i++) {
+					// Projektionsattribut aus Liste holen
+					String column = projectionList.get(i);
+					// Nur Value für dieses Attribut rausschreiben
+					values.append(columnMap.get(column)).append("\t");
+				}
+				// values.delete(values.length() - 2, values.length());
+				projectedValues = new Text(values.toString());
 
+			}
+			// Projezierte Tupel herausschreiben
+			tableWriter.write(projectedValues, NullWritable.get());
+		}
+
+		// Ergebnisschema rausschreiben
+		StringBuilder sb = new StringBuilder();
+		// for (int i = 0; i < attributeNames.size(); i++) {
+		// sb.append(attributeNames.get(i) + ":" + attributeDomains.get(i) +
+		// "\t");
+		// }
+		schemeWriter.write(new Text(sb.toString()), NullWritable.get());
 	}
 
 }

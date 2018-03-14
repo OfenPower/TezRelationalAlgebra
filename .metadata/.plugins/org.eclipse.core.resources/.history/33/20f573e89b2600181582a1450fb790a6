@@ -1,0 +1,8 @@
+package de.bachd.bigdata.tez;
+
+public class DAGTestBuilder {
+
+	public static DAG buildSelfJoinDAG() {
+
+	}
+}

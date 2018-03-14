@@ -1,0 +1,228 @@
+package de.bachd.bigdata.tez;
+
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Queue;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.conf.Configured;
+import org.apache.hadoop.util.Tool;
+import org.apache.hadoop.util.ToolRunner;
+import org.apache.tez.client.TezClient;
+import org.apache.tez.dag.api.DAG;
+import org.apache.tez.dag.api.TezConfiguration;
+import org.apache.tez.dag.api.TezException;
+import org.apache.tez.dag.api.client.DAGClient;
+import org.apache.tez.dag.api.client.DAGStatus;
+import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
+
+import com.google.common.base.CharMatcher;
+import com.google.common.base.Splitter;
+import com.google.common.collect.Lists;
+
+/**
+ * Hello World!
+ *
+ */
+public class Main extends Configured implements Tool {
+
+	public static final String ARTIKELDATAINPUT = "ArtikelDataInput";
+	public static final String ARTIKELSCHEMEINPUT = "ArtikelSchemeInput";
+	public static final String LIEGENDATAINPUT = "LiegenDataInput";
+	public static final String LIEGENSCHEMEINPUT = "LiegenSchemeInput";
+	public static final String RESULTOUTPUT = "ResultOutput";
+	public static final String ARTIKELTABLEPROCESSOR = "ArtikelTableProcessor";
+	public static final String ARTIKELSCHEMEPROCESSOR = "ArtikelSchemeProcessor";
+	public static final String LIEGENTABLEPROCESSOR = "LiegenTableProcessor";
+	public static final String LIEGENSCHEMEPROCESSOR = "LiegenSchemeProcessor";
+	public static final String HASHJOINPROCESSOR = "HashJoinProcessor";
+	public static final String SELECTIONPROCESSOR = "SelectionProcessor";
+	public static final String GROUPBYPROCESSOR = "GroupByProcessor";
+	public static final String PROJECTIONPROCESSOR = "ProjectionProcessor";
+	public static final String AGGREGATIONPROCESSOR = "AggregationProcessor";
+
+	List<Configuration> joinConfigurations = new ArrayList<>();
+	Configuration selectionConfiguration = new Configuration();
+	Configuration groupByConfiguration = new Configuration();
+	Configuration aggregationConfiguration = new Configuration();
+	Configuration projectionConfiguration = new Configuration();
+
+	@Override
+	public int run(String[] args) throws Exception {
+		// Tez lokal aufsetzen
+		TezConfiguration tezConf = new TezConfiguration();
+		tezConf.setBoolean(TezConfiguration.TEZ_LOCAL_MODE, true);
+		tezConf.set("fs.default.name", "file:///");
+		tezConf.setBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH, true);
+		// tezConf.set(TezRuntimeConfiguration.TEZ_RUNTIME_KEY_CLASS,
+		// Tuple.class.getName());
+		// tezConf.set(TezRuntimeConfiguration.TEZ_RUNTIME_VALUE_CLASS,
+		// NullWritable.class.getName());
+
+		// Query aus angegebener Datei in eineen String auslesen
+		String fileName = "./querys/" + args[0];
+		File file = new File(fileName);
+		try (FileReader fin = new FileReader(file); BufferedReader br = new BufferedReader(fin)) {
+
+		}
+
+		// TezClient starten
+		TezClient tezClient = TezClient.create("TezClient", tezConf);
+		tezClient.start();
+
+		//
+		// String query = "SELECT artikel.ArtNr, artikel.ArtName,
+		// count(liegen.LagerNr), sum(liegen.Bestand)\n"
+		// + "FROM artikel\n " + "JOIN liegen ON artikel.ArtNr = liegen.ArtNr\n
+		// "
+		// + "WHERE artikel.ArtNr != 1003\n " + "GROUP BY artikel.ArtNr,
+		// artikel.ArtName\n ";
+
+		return runFullJob(args, tezConf, tezClient);
+	}
+
+	private int runTezJob(String query, TezConfiguration tezConf, TezClient tezClient)
+			throws TezException, IOException {
+
+		// Query in 5 Bestandteile aufsplitten:
+		// -------------------------------------
+		// SELECT a, b, f(c)
+		// FROM r JOIN s ON r.a = s.a
+		// [...]
+		// WHERE P1
+		// GROUP BY a, b
+		// -------------------------------------
+
+		System.out.println("----------QueueStart----------");
+		Queue<String> queryPartQueue = null;
+		// Queues.newArrayDeque(Splitter.on('\n').trimResults().omitEmptyStrings().split(query));
+		while (!queryPartQueue.isEmpty()) {
+			String queryPart = queryPartQueue.poll();
+			// PROJEKTION
+			if (queryPart.startsWith("SELECT")) {
+				setProjectionAndAggregationConfiguration(queryPart);
+			}
+
+			// FROM
+
+			// JOIN
+
+			// SELEKTION
+			if (queryPart.startsWith("WHERE")) {
+				setSelectionConfiguration(queryPart);
+			}
+
+			// GROUP BY
+
+		}
+		System.out.println("----------QueueEnd----------");
+
+		List<String> queryParts = Lists.newArrayList(Splitter.on('\n').trimResults().omitEmptyStrings().split(query));
+		// for (int i = 0; i < queryParts.size(); i++) {
+		// System.out.println(queryParts.get(i));
+		// if (!queryParts.get(0).startsWith("SELECT")) {
+		// throw new IllegalArgumentException("query muss mit SELECT
+		// beginnen!");
+		// } else {
+		// setProjectionAndAggregationConfiguration(queryParts.get(0));
+		// }
+		// }
+
+		// setProjectionAndAggregationConfiguration(queryParts.get(0));
+		// setSelectionConfiguration(queryParts.get(3));
+		// setGroupByConfiguration(queryParts.get(4));
+
+		return 0;
+	}
+
+	private void setProjectionAndAggregationConfiguration(String queryPart) {
+		System.out.println("---- setProjectionAndAggregationConfiguration ----");
+		// ProjectionConfiguration
+		//
+		List<String> queryParts01 = Lists
+				.newArrayList(Splitter.on(' ').trimResults().omitEmptyStrings().limit(2).split(queryPart));
+		System.out.println(queryParts01.get(1));
+		this.projectionConfiguration.set("Projection", queryParts01.get(1));
+		// AggregationConfiguration
+		//
+		List<String> queryParts02 = Lists.newArrayList(Splitter.on(CharMatcher.anyOf(" ").or(CharMatcher.anyOf(", ")))
+				.trimResults().omitEmptyStrings().split(queryPart));
+		// Aggregatfunktionen im SELECT-Statement erkennt man an einer öffnenden
+		// Klammer!
+		StringBuilder sb = new StringBuilder();
+		for (int i = 1; i < queryParts02.size(); i++) {
+			if (queryParts02.get(i).contains("(")) {
+				sb.append(queryParts02.get(i));
+				sb.append(", ");
+			}
+		}
+		sb.delete(sb.length() - 2, sb.length());
+		System.out.println(sb.toString());
+		this.aggregationConfiguration.set("AggregateFunctions", sb.toString());
+	}
+
+	private void setSelectionConfiguration(String queryPart) {
+		System.out.println("---- setSelectionConfiguration ----");
+		List<String> queryParts = Lists
+				.newArrayList(Splitter.on(' ').trimResults().omitEmptyStrings().limit(2).split(queryPart));
+		System.out.println(queryParts.get(1));
+		selectionConfiguration.set("SelectionPredicate", queryParts.get(1));
+	}
+
+	private void setGroupByConfiguration(String queryPart) {
+		System.out.println("---- setGroupByConfiguration ----");
+		List<String> queryParts = Lists
+				.newArrayList(Splitter.on(' ').trimResults().omitEmptyStrings().limit(3).split(queryPart));
+		System.out.println(queryParts.get(2));
+		this.groupByConfiguration.set("GroupByAttributes", queryParts.get(2));
+	}
+
+	private int runSelfJoinJob(String[] args, TezConfiguration tezConf, TezClient tezClient)
+			throws IOException, TezException {
+
+		DAG dag = DAGTestBuilder.buildSelfJoinDAG(args, tezConf);
+
+		System.out.println("Start DAG");
+		try {
+			DAGClient dagClient = tezClient.submitDAG(dag);
+			DAGStatus dagStatus;
+			dagStatus = dagClient.waitForCompletionWithStatusUpdates(null);
+			System.out.println("DAG diagnostics: " + dagStatus.getDiagnostics());
+		} catch (InterruptedException ex) {
+			ex.printStackTrace();
+		}
+
+		return 0;
+
+	}
+
+	private int runFullJob(String[] args, TezConfiguration tezConf, TezClient tezClient)
+			throws TezException, IOException {
+
+		DAG dag = DAGTestBuilder.buildFullDAG(args, tezConf);
+
+		System.out.println("Start DAG");
+		try {
+			DAGClient dagClient = tezClient.submitDAG(dag);
+			DAGStatus dagStatus;
+			dagStatus = dagClient.waitForCompletionWithStatusUpdates(null);
+			System.out.println("DAG diagnostics: " + dagStatus.getDiagnostics());
+		} catch (InterruptedException ex) {
+			ex.printStackTrace();
+		}
+
+		return 0;
+	}
+
+	public static void main(String[] args) throws Exception {
+		if (args.length != 1) {
+			System.out.println("Too many arguments! Enter only one .sql file (e.g. query01.sql)");
+		} else {
+			ToolRunner.run(new Configuration(), new Main(), args);
+		}
+	}
+}

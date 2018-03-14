@@ -33,7 +33,7 @@ public class GroupByProcessor extends SimpleProcessor {
 			// der ausgehenden OrderedPartitionedEdge partitioniert und
 			// gruppiert!
 			Tuple tuple = (Tuple) kvReader.getCurrentKey();
-			Map<String, String> tupleColumnStringMap = tuple.getColumnStringMap();
+			Map<String, String> tupleColumnStringMap = tuple.getNamesValuesMap();
 			StringBuilder sb = new StringBuilder();
 			for (String attribute : groupByAttributeList) {
 				sb.append(tupleColumnStringMap.get(attribute));

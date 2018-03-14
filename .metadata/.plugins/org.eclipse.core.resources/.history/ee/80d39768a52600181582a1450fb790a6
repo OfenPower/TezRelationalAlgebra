@@ -1,0 +1,13 @@
+package de.bachd.bigdata.tez;
+
+import org.apache.tez.dag.api.DAG;
+import org.apache.tez.dag.api.TezConfiguration;
+
+public class DAGBuilder {
+
+	static DAG buildDAGFromFile(String[] args, TezConfiguration tezConf) {
+
+		return null;
+	}
+
+}

@@ -1,1 +1,1 @@
-artikel; ArtNr:Integer	ArtName:String	ArtPreis:Double
+artikel; anr:integer	name:string	preis:double

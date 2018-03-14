@@ -32,7 +32,7 @@ public class SumStrategy implements AggregationStrategy {
 
 	@Override
 	public String getResultDomain() {
-		return "Double";
+		return "double";
 	}
 
 }

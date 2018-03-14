@@ -4,11 +4,8 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.Text;
-import org.apache.tez.common.TezUtils;
-import org.apache.tez.dag.api.UserPayload;
 import org.apache.tez.mapreduce.processor.SimpleMRProcessor;
 import org.apache.tez.runtime.api.LogicalInput;
 import org.apache.tez.runtime.api.ProcessorContext;
@@ -28,12 +25,12 @@ public class TableProcessor extends SimpleMRProcessor {
 	@Override
 	public void run() throws Exception {
 		Iterator<LogicalInput> kvReaderItr = getInputs().values().iterator();
+		KeyValueWriter kvTableWriter = (KeyValueWriter) getOutputs().values().iterator().next().getWriter();
+		// erster Mapeintrag ist DATAINPUT, wurde mit .addDataSource()
+		// eingetragen
 		KeyValueReader kvSchemeReader = null;
 		KeyValueReader kvDataReader = null;
-		KeyValueWriter kvTableWriter = (KeyValueWriter) getOutputs().values().iterator().next().getWriter();
 		while (kvReaderItr.hasNext()) {
-			// erster Mapeintrag ist DATAINPUT, wurde mit .addDataSource()
-			// eingetragen
 			kvDataReader = (KeyValueReader) kvReaderItr.next().getReader();
 			kvSchemeReader = (KeyValueReader) kvReaderItr.next().getReader();
 		}
@@ -83,15 +80,14 @@ public class TableProcessor extends SimpleMRProcessor {
 				kvTableWriter.write(tuple, nullValue);
 			}
 		}
-
 	}
 
 	@Override
 	public void initialize() throws Exception {
 		System.out.println("Initialize TableProcessor");
-		UserPayload up = getContext().getUserPayload();
-		Configuration conf = TezUtils.createConfFromUserPayload(up);
-		this.newRelationName = conf.get("RelationRename");
+		// UserPayload up = getContext().getUserPayload();
+		// Configuration conf = TezUtils.createConfFromUserPayload(up);
+		// this.newRelationName = conf.get("NewRelationRename");
 
 	}
 }

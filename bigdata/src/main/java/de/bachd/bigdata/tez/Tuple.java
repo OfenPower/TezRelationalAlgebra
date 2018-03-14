@@ -71,10 +71,18 @@ public class Tuple implements Writable {
 		return attributeValuesCopy;
 	}
 
-	public Map<String, String> getColumnStringMap() {
+	public Map<String, String> getNamesValuesMap() {
 		Map<String, String> map = new HashMap<>();
 		for (int i = 0; i < attributeNames.size(); i++) {
 			map.put(attributeNames.get(i), attributeValues.get(i));
+		}
+		return map;
+	}
+
+	public Map<String, String> getNamesDomainsMap() {
+		Map<String, String> map = new HashMap<>();
+		for (int i = 0; i < attributeNames.size(); i++) {
+			map.put(attributeNames.get(i), attributeDomains.get(i));
 		}
 		return map;
 	}
@@ -83,13 +91,13 @@ public class Tuple implements Writable {
 		Map<String, PredicateComparable> map = new HashMap<>();
 		for (int i = 0; i < attributeNames.size(); i++) {
 			String value = attributeValues.get(i);
-			if (attributeDomains.get(i).equals("Integer")) {
+			if (attributeDomains.get(i).equals("integer")) {
 				IntegerComparable ic = new IntegerComparable(Integer.parseInt(value));
 				map.put(attributeNames.get(i), ic);
-			} else if (attributeDomains.get(i).equals("String")) {
+			} else if (attributeDomains.get(i).equals("string")) {
 				StringComparable sc = new StringComparable(value);
 				map.put(attributeNames.get(i), sc);
-			} else if (attributeDomains.get(i).equals("Double")) {
+			} else if (attributeDomains.get(i).equals("double")) {
 				DoubleComparable dc = new DoubleComparable(Double.parseDouble(value));
 				map.put(attributeNames.get(i), dc);
 			}
