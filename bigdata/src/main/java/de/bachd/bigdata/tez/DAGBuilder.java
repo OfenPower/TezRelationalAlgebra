@@ -1,8 +1,10 @@
 package de.bachd.bigdata.tez;
 
 import java.io.IOException;
-import java.util.ArrayList;
+import java.util.ArrayDeque;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.NullWritable;
@@ -35,28 +37,41 @@ public class DAGBuilder {
 	private UserPayload selectionParameter;
 	private UserPayload tableParameter;
 
-	private List<String> dataSourceList = new ArrayList<>();
-	private List<DataSourceDescriptor> dataSourceDescriptorList = new ArrayList<>();
+	private ArrayDeque<String> dataSourceQueue = new ArrayDeque<>();
 	private DataSinkDescriptor outputTable;
 	private DataSinkDescriptor outputScheme;
 
 	private int vertexCount = 0;
-	private List<Vertex> vertexList = new ArrayList<>();
-	private List<Edge> edgeList = new ArrayList<>();
+	private ArrayDeque<Vertex> vertexQueue = new ArrayDeque<>();
+	private ArrayDeque<Edge> edgeQueue = new ArrayDeque<>();
+	private Map<String, Vertex> relationVertexMap = new HashMap<>();
+	private Map<String, String> relationJoinattributeMap = new HashMap<>();
 
-	public DAG buildDAGFromString(String query, TezConfiguration tezConf) throws TezException, IOException {
+	public DAG buildDAGFromString(String query, TezConfiguration tezConf) throws Exception {
 		initializeUserPayloads(query);
 		initializeDataSourcesAndDataSinks(tezConf);
-		if (needSelection)
+		// Wenn mehr als eine DataSource vorhanden: Ersten Joinknoten
+		// initialisieren
+		if (dataSourceQueue.size() >= 2) {
+			initializeFirstJoinVertex(tezConf);
+		}
+		// Solange noch DataSources vorhanden sind => zusätzliche Joinknoten
+		// initialisieren
+		if (!dataSourceQueue.isEmpty()) {
+			initializeJoinVertex(tezConf);
+		}
+		// Selektion benötigt?
+		if (needSelection) {
 			initializeSelectionVertex(tezConf);
+		}
 		initializeProjectionVertex(tezConf);
 
 		// DAG zusammenbasteln
 		DAG dag = DAG.create("DAG");
-		for (Vertex v : vertexList) {
+		for (Vertex v : vertexQueue) {
 			dag.addVertex(v);
 		}
-		for (Edge e : edgeList) {
+		for (Edge e : edgeQueue) {
 			dag.addEdge(e);
 		}
 
@@ -67,12 +82,19 @@ public class DAGBuilder {
 
 		List<String> queryParts = Lists.newArrayList(Splitter.on("\n").trimResults().omitEmptyStrings().split(query));
 		for (String s : queryParts) {
+			// Projektionspayload initialisieren
 			if (s.startsWith("SELECT")) {
 				setProjectionAndAggregationPayload(s);
 			}
+			// Erste DataSource initialisieren
 			if (s.startsWith("FROM")) {
 				setTablePayload(s);
 			}
+			// Weitere DataSources pro JOINs initialisieren
+			if (s.startsWith("JOIN")) {
+				prepareJoinInformation(s.substring(5));
+			}
+			// Selektionspayload initialisieren
 			if (s.startsWith("WHERE")) {
 				setSelectionPayload(s);
 			}
@@ -82,14 +104,12 @@ public class DAGBuilder {
 	private void initializeDataSourcesAndDataSinks(TezConfiguration tezConf) {
 		// Für jede gespeicherte Relation in dataSourceList je zwei
 		// DataSourceDescriptor erzeugen (1x für .csv und 1x für .scheme)
-		for (String dataSource : dataSourceList) {
+		for (String dataSource : dataSourceQueue) {
 			DataSourceDescriptor data = MRInput
 					.createConfigBuilder(new Configuration(tezConf), TextInputFormat.class, "./tables/" + dataSource)
 					.build();
 			DataSourceDescriptor scheme = MRInput.createConfigBuilder(new Configuration(tezConf), TextInputFormat.class,
 					"./tables/" + dataSource + ".scheme").build();
-			dataSourceDescriptorList.add(data);
-			dataSourceDescriptorList.add(scheme);
 
 			// Je zwei Vertices erzugen (1x scheme, 1x data), diese mit
 			// vertexCount durchnummerieren (v1, v2, etc.) und in Liste
@@ -98,15 +118,21 @@ public class DAGBuilder {
 			Vertex v2 = Vertex.create("v" + ++vertexCount, ProcessorDescriptor.create(TableProcessor.class.getName()));
 			v1.addDataSource("SchemeInput", scheme);
 			v2.addDataSource("DataInput", data);
-			vertexList.add(v1);
-			vertexList.add(v2);
+			vertexQueue.add(v1);
+			vertexQueue.add(v2);
 
 			// Die erzeugten Vertices mit einer Edge verbinden und die Edge
 			// abspeichern
 			UnorderedKVEdgeConfig eConfig = UnorderedKVEdgeConfig.newBuilder(Text.class.getName(), Text.class.getName())
 					.setFromConfiguration(tezConf).build();
 			Edge e1 = Edge.create(v1, v2, eConfig.createDefaultBroadcastEdgeProperty());
-			edgeList.add(e1);
+			edgeQueue.add(e1);
+
+			// relation mit dem Namen des Vertex welcher diese Relation im
+			// TableProcessor lädt in einer Map speichern (Bsp: <artikel, v2>,
+			// <lager, v4>))
+			relationVertexMap.put(dataSource, v2);
+			System.out.println("RelationVertex Eintrag: " + dataSource + " verarbeitet von Vertex: " + v2.getName());
 		}
 
 		// Zwei DataSinks erzeugen (1x für Ergebnisdaten und 1x für das
@@ -119,20 +145,113 @@ public class DAGBuilder {
 				.build();
 	}
 
+	private void initializeFirstJoinVertex(TezConfiguration tezConf) throws Exception {
+		// Die ersten beiden zu joinenden Relation aus der DataSourceQueue
+		// entnehmen
+		String leftRelationToJoin = dataSourceQueue.removeFirst();
+		String rightRelationToJoin = dataSourceQueue.removeFirst();
+
+		// Joinattribut (wurde bei zweiter Relation abgespeichert) aus Map
+		// nehmen
+		String joinAttribute = relationJoinattributeMap.get(rightRelationToJoin);
+
+		// Namen der Vertices holen, welche die jeweilige Relation im
+		// TableProcessor vorbereiten
+		Vertex leftJoinVertex = relationVertexMap.get(leftRelationToJoin);
+		Vertex rightJoinVertex = relationVertexMap.get(rightRelationToJoin);
+		String leftRelationVertexName = leftJoinVertex.getName();
+		String rightRelationVertexName = rightJoinVertex.getName();
+
+		// UserPayload mit Joinparametern initialisieren
+		Configuration conf = new Configuration();
+		if (joinAttribute.startsWith(leftRelationToJoin)) {
+			System.out.println(true);
+			conf.set("LeftJoinVertexName", leftRelationVertexName);
+			conf.set("RightJoinVertexName", rightRelationVertexName);
+		} else {
+			System.out.println(false);
+			conf.set("LeftJoinVertexName", rightRelationVertexName);
+			conf.set("RightJoinVertexName", leftRelationVertexName);
+		}
+		conf.set("JoinAttribute", joinAttribute);
+		UserPayload up = TezUtils.createUserPayloadFromConf(conf);
+
+		// HashJoin-Vertex erzeugen
+		Vertex hashJoinVertex = Vertex.create("v" + ++vertexCount,
+				ProcessorDescriptor.create(HashJoinProcessor.class.getName()).setUserPayload(up), 1);
+
+		// Join-Vertex mit zwei Edges an die jeweiligen Vertices koppeln, welche
+		// gejoined werden sollen
+		UnorderedKVEdgeConfig eConfig = UnorderedKVEdgeConfig
+				.newBuilder(Tuple.class.getName(), NullWritable.class.getName()).setFromConfiguration(tezConf).build();
+		Edge e1 = Edge.create(leftJoinVertex, hashJoinVertex, eConfig.createDefaultBroadcastEdgeProperty());
+		Edge e2 = Edge.create(rightJoinVertex, hashJoinVertex, eConfig.createDefaultBroadcastEdgeProperty());
+
+		// Vertex und zwei Edges in die jeweiligen Queues stecken
+		vertexQueue.add(hashJoinVertex);
+		edgeQueue.add(e1);
+		edgeQueue.add(e2);
+	}
+
+	private void initializeJoinVertex(TezConfiguration tezConf) throws IOException {
+		// Zu joinende Relation aus der dataSourceQueue nehmen
+		String relationToJoin = dataSourceQueue.removeFirst();
+
+		// dazugehöriges Joinattribut aus Map nehmen
+		String joinAttribute = relationJoinattributeMap.get(relationToJoin);
+
+		// Zu joinende Knoten holen
+		Vertex vertexToJoin = relationVertexMap.get(relationToJoin);
+		Vertex existingHashJoinVertex = vertexQueue.getLast();
+		String relationVertexName = vertexToJoin.getName();
+		String hashJoinVertexName = existingHashJoinVertex.getName();
+
+		// UserPayload mit Joinparametern initialisieren
+		Configuration conf = new Configuration();
+		if (joinAttribute.startsWith(relationToJoin)) {
+			System.out.println(true);
+			conf.set("LeftJoinVertexName", relationVertexName);
+			conf.set("RightJoinVertexName", hashJoinVertexName);
+		} else {
+			System.out.println(false);
+			conf.set("LeftJoinVertexName", hashJoinVertexName);
+			conf.set("RightJoinVertexName", relationVertexName);
+		}
+		conf.set("JoinAttribute", joinAttribute);
+		UserPayload up = TezUtils.createUserPayloadFromConf(conf);
+
+		// HashJoin-Vertex erzeugen
+		Vertex newHashJoinVertex = Vertex.create("v" + ++vertexCount,
+				ProcessorDescriptor.create(HashJoinProcessor.class.getName()).setUserPayload(up), 1);
+
+		// Join-Vertex mit zwei Edges an die jeweiligen Vertices koppeln, welche
+		// gejoined werden sollen
+		UnorderedKVEdgeConfig eConfig = UnorderedKVEdgeConfig
+				.newBuilder(Tuple.class.getName(), NullWritable.class.getName()).setFromConfiguration(tezConf).build();
+		Edge e1 = Edge.create(existingHashJoinVertex, newHashJoinVertex, eConfig.createDefaultBroadcastEdgeProperty());
+		Edge e2 = Edge.create(vertexToJoin, newHashJoinVertex, eConfig.createDefaultBroadcastEdgeProperty());
+
+		// Vertex und zwei Edges in die jeweiligen Queues stecken
+		vertexQueue.add(newHashJoinVertex);
+		edgeQueue.add(e1);
+		edgeQueue.add(e2);
+	}
+
 	private void initializeSelectionVertex(TezConfiguration tezConf) {
 		// Selektionsknoten erzeugen und speichern
 		Vertex v = Vertex.create("v" + ++vertexCount,
 				ProcessorDescriptor.create(SelectionProcessor.class.getName()).setUserPayload(selectionParameter), 1);
-		vertexList.add(v);
+		Vertex vertexToConnect = vertexQueue.getLast();
+		vertexQueue.add(v);
 
 		// Vorletzten Vertex der Liste holen und mit Selektionsknoten über Edge
 		// verknüpfen
 		UnorderedKVEdgeConfig eConfig = UnorderedKVEdgeConfig
 				.newBuilder(Tuple.class.getName(), NullWritable.class.getName()).setFromConfiguration(tezConf).build();
-		Vertex vertexToConnect = vertexList.get(vertexList.size() - 2);
+		// Vertex vertexToConnect = vertexList.get(vertexList.size() - 2);
 		Edge e = Edge.create(vertexToConnect, v, eConfig.createDefaultBroadcastEdgeProperty());
 
-		edgeList.add(e);
+		edgeQueue.add(e);
 	}
 
 	private void initializeProjectionVertex(TezConfiguration tezConf) {
@@ -141,15 +260,16 @@ public class DAGBuilder {
 				ProcessorDescriptor.create(ProjectionProcessor.class.getName()).setUserPayload(projectionParameter), 1);
 		v.addDataSink("OutputTable", outputTable);
 		v.addDataSink("OutputScheme", outputScheme);
-		vertexList.add(v);
+		Vertex vertexToConnect = vertexQueue.getLast();
+		vertexQueue.add(v);
 
 		// Vorletzten Vertex der Liste holen und mit Projektionsknoten über Edge
 		// verknüpfen
 		UnorderedKVEdgeConfig eConfig = UnorderedKVEdgeConfig
 				.newBuilder(Tuple.class.getName(), NullWritable.class.getName()).setFromConfiguration(tezConf).build();
-		Vertex vertexToConnect = vertexList.get(vertexList.size() - 2);
+		// Vertex vertexToConnect = vertexList.get(vertexList.size() - 2);
 		Edge e = Edge.create(vertexToConnect, v, eConfig.createDefaultBroadcastEdgeProperty());
-		edgeList.add(e);
+		edgeQueue.add(e);
 	}
 
 	private void setProjectionAndAggregationPayload(String queryPart) throws IOException {
@@ -171,7 +291,7 @@ public class DAGBuilder {
 		}
 		System.out.println();
 		// Name der Source-Relation speichern
-		this.dataSourceList.add(queryParts.get(1));
+		this.dataSourceQueue.add(queryParts.get(1));
 		// Muss eine Relation umbenannt werden?
 		Configuration conf = new Configuration();
 		if (queryParts.size() == 3) {
@@ -195,6 +315,23 @@ public class DAGBuilder {
 		this.selectionParameter = TezUtils.createUserPayloadFromConf(conf);
 		needSelection = true; // flag setzen, um später einen Selection-Vertex
 								// zu erzeugen
+	}
+
+	private void prepareJoinInformation(String queryPart) throws IOException {
+		System.out.println("---- setJoinConfiguration ----");
+		// System.out.println(queryPart);
+		List<String> queryParts = Lists
+				.newArrayList(Splitter.on(' ').trimResults().omitEmptyStrings().limit(3).split(queryPart));
+		for (String s : queryParts) {
+			System.out.println(s);
+		}
+
+		// Neue Relation soll gejoined werden => in dataSourceQueue packen und
+		// das dazugehörige Joinattribut speichern
+		dataSourceQueue.add(queryParts.get(0));
+		relationJoinattributeMap.put(queryParts.get(0), queryParts.get(2));
+		System.out.println(
+				"Zu joinende Relation: " + queryParts.get(0) + " mit folgendem Joinattribut: " + queryParts.get(2));
 	}
 
 	/*

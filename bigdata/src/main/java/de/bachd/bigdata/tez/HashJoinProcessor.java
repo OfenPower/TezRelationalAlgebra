@@ -26,8 +26,10 @@ import com.google.common.collect.ListMultimap;
 
 public class HashJoinProcessor extends SimpleProcessor {
 
-	private String leftSideJoinAttribute;
-	private String rightSideJoinAttribute;
+	private String leftJoinVertexName;
+	private String rightJoinVertexName;
+	private String leftJoinAttribute;
+	private String rightJoinAttribute;
 
 	public HashJoinProcessor(ProcessorContext context) {
 		super(context);
@@ -36,8 +38,8 @@ public class HashJoinProcessor extends SimpleProcessor {
 	@Override
 	public void run() throws Exception {
 		// KeyValueReader und Writer initialisieren
-		KeyValueReader kvReader1 = (KeyValueReader) getInputs().get("ArtikelTableProcessor").getReader();
-		KeyValueReader kvReader2 = (KeyValueReader) getInputs().get("LiegenTableProcessor").getReader();
+		KeyValueReader kvReader1 = (KeyValueReader) getInputs().get(leftJoinVertexName).getReader();
+		KeyValueReader kvReader2 = (KeyValueReader) getInputs().get(rightJoinVertexName).getReader();
 		KeyValueWriter kvWriter = (KeyValueWriter) getOutputs().values().iterator().next().getWriter();
 		// Multimap zum Hashjoin verwenden! In einer Multimap können mehrere
 		// Values mit gleichen Key gemappt werden. Die Values werden dann pro
@@ -47,8 +49,8 @@ public class HashJoinProcessor extends SimpleProcessor {
 		// Alle Tupel der linken Join-Relation in die Hashmap laden
 		while (kvReader1.next()) {
 			Tuple tuple = (Tuple) kvReader1.getCurrentKey();
-			String value = tuple.getNamesValuesMap().get(this.leftSideJoinAttribute);
-
+			String value = tuple.getNamesValuesMap().get(this.leftJoinAttribute);
+			System.out.println("----------" + value + "    " + leftJoinAttribute);
 			// Tupleobjekt kopieren und in Multimap laden
 			// key = joinattribut, value = kopiertes Tuple, welches in Liste
 			// kopiert wird
@@ -66,7 +68,7 @@ public class HashJoinProcessor extends SimpleProcessor {
 			Tuple rightTuple = (Tuple) kvReader2.getCurrentKey();
 			// Multimap besteht aus Listen von leftSide-Tupeln =>
 			// rightSideJoinAttribute zum Zugriff auf Attribute benutzen
-			String joinAttribute = rightTuple.getNamesValuesMap().get(this.rightSideJoinAttribute);
+			String joinAttribute = rightTuple.getNamesValuesMap().get(this.rightJoinAttribute);
 			// Kommt joinAttribute in HashMap vor?
 			if (joinMultimap.containsKey(joinAttribute)) {
 				// => rightTuple mit allen gemappten leftTuple joinen!
@@ -97,14 +99,18 @@ public class HashJoinProcessor extends SimpleProcessor {
 		System.out.println("Initialize HashJoinProcessor");
 		UserPayload up = getContext().getUserPayload();
 		Configuration conf = TezUtils.createConfFromUserPayload(up);
+		leftJoinVertexName = conf.get("LeftJoinVertexName");
+		rightJoinVertexName = conf.get("RightJoinVertexName");
+		System.out.println("LEFT JOIN VERTEX NAME: " + leftJoinVertexName);
+		System.out.println("RIGHT JOIN VERTEX NAME: " + rightJoinVertexName);
 		String joinAttributes = conf.get("JoinAttribute");
 		// Join-String splitten und in linkes und rechtes Joinattribut der Form
 		// "Relation.Attributname" abspeichern
 		Iterable<String> attrItr2 = Splitter.on('=').trimResults().omitEmptyStrings().split(joinAttributes);
 		Iterator<String> attrIterator2 = attrItr2.iterator();
 		while (attrIterator2.hasNext()) {
-			this.leftSideJoinAttribute = attrIterator2.next();
-			this.rightSideJoinAttribute = attrIterator2.next();
+			this.leftJoinAttribute = attrIterator2.next();
+			this.rightJoinAttribute = attrIterator2.next();
 			// DEBUG: Joinattribute anzeigen!
 			// System.out.println(this.leftSideJoinAttribute);
 			// System.out.println(this.rightSideJoinAttribute);

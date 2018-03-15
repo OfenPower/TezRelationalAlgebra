@@ -55,6 +55,8 @@ public class Main extends Configured implements Tool {
 	}
 
 	private int runDAGJob(DAG dag, TezConfiguration tezConf, TezClient tezClient) throws TezException, IOException {
+		System.out.println();
+		System.out.println();
 		System.out.println("Start DAG");
 		try {
 			DAGClient dagClient = tezClient.submitDAG(dag);

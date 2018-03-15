@@ -6,4 +6,7 @@
 <fullyQualifiedTypeName name="de.bachd.bigdata.TezExampleBase"/>
 <fullyQualifiedTypeName name="org.apache.tez.dag.api.EdgeProperty"/>
 <fullyQualifiedTypeName name="com.google.common.collect.Queues"/>
+<fullyQualifiedTypeName name="java.util.Queue"/>
+<fullyQualifiedTypeName name="java.util.Map"/>
+<fullyQualifiedTypeName name="org.apache.tez.dag.api.UserPayload"/>
 </qualifiedTypeNameHistroy>
