@@ -6,6 +6,11 @@ import org.apache.tez.runtime.api.AbstractLogicalInput;
 import org.apache.tez.runtime.api.Event;
 import org.apache.tez.runtime.api.InputContext;
 import org.apache.tez.runtime.api.Reader;
+import org.apache.tez.runtime.api.Writer;
+
+class WriterTest extends Writer {
+
+}
 
 public class InputTest extends AbstractLogicalInput {
 

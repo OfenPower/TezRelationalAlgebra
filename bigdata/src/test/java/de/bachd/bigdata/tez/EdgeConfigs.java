@@ -1,5 +1,6 @@
 package de.bachd.bigdata.tez;
 
+import org.apache.hadoop.io.DoubleWritable;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.tez.runtime.library.conf.OrderedPartitionedKVEdgeConfig;
@@ -9,10 +10,18 @@ import org.apache.tez.runtime.library.partitioner.HashPartitioner;
 
 public class EdgeConfigs {
 
-	UnorderedKVEdgeConfig eConf1 = UnorderedKVEdgeConfig.newBuilder(IntWritable.class.getName(), Text.class.getName())
-			.build();
-	UnorderedPartitionedKVEdgeConfig eConf2 = UnorderedPartitionedKVEdgeConfig
-			.newBuilder(IntWritable.class.getName(), Text.class.getName(), HashPartitioner.class.getName()).build();
-	OrderedPartitionedKVEdgeConfig eConf3 = OrderedPartitionedKVEdgeConfig
-			.newBuilder(IntWritable.class.getName(), Text.class.getName(), HashPartitioner.class.getName()).build();
+	public static void main(String[] args) {
+
+		UnorderedKVEdgeConfig eConf1 = UnorderedKVEdgeConfig
+				.newBuilder(IntWritable.class.getName(), Text.class.getName()).build();
+		UnorderedPartitionedKVEdgeConfig eConf2 = UnorderedPartitionedKVEdgeConfig
+				.newBuilder(IntWritable.class.getName(), Text.class.getName(), HashPartitioner.class.getName()).build();
+		OrderedPartitionedKVEdgeConfig eConf3 = OrderedPartitionedKVEdgeConfig
+				.newBuilder(DoubleWritable.class.getName(), Text.class.getName(), HashPartitioner.class.getName())
+				.build();
+
+		System.out.println(eConf1.getOutputClassName() + "    " + eConf1.getInputClassName());
+		System.out.println(eConf3.getOutputClassName() + "    " + eConf3.getInputClassName());
+
+	}
 }

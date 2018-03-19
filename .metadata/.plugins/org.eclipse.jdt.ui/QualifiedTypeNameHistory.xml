@@ -9,4 +9,5 @@
 <fullyQualifiedTypeName name="java.util.Queue"/>
 <fullyQualifiedTypeName name="java.util.Map"/>
 <fullyQualifiedTypeName name="org.apache.tez.dag.api.UserPayload"/>
+<fullyQualifiedTypeName name="org.apache.hadoop.io.DoubleWritable"/>
 </qualifiedTypeNameHistroy>

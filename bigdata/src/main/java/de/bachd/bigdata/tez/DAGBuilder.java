@@ -120,12 +120,15 @@ public class DAGBuilder {
 			v2.addDataSource("DataInput", data);
 			vertexQueue.add(v1);
 			vertexQueue.add(v2);
+			System.out.println("Parallelism: " + v2.getParallelism());
 
 			// Die erzeugten Vertices mit einer Edge verbinden und die Edge
 			// abspeichern
 			UnorderedKVEdgeConfig eConfig = UnorderedKVEdgeConfig.newBuilder(Text.class.getName(), Text.class.getName())
 					.setFromConfiguration(tezConf).build();
-			Edge e1 = Edge.create(v1, v2, eConfig.createDefaultBroadcastEdgeProperty());
+			// Edge e1 = Edge.create(v1, v2,
+			// eConfig.createDefaultBroadcastEdgeProperty());
+			Edge e1 = Edge.create(v1, v2, eConfig.createDefaultOneToOneEdgeProperty());
 			edgeQueue.add(e1);
 
 			// relation mit dem Namen des Vertex welcher diese Relation im
@@ -178,14 +181,18 @@ public class DAGBuilder {
 
 		// HashJoin-Vertex erzeugen
 		Vertex hashJoinVertex = Vertex.create("v" + ++vertexCount,
-				ProcessorDescriptor.create(HashJoinProcessor.class.getName()).setUserPayload(up), 1);
+				ProcessorDescriptor.create(HashJoinProcessor.class.getName()).setUserPayload(up));
 
 		// Join-Vertex mit zwei Edges an die jeweiligen Vertices koppeln, welche
 		// gejoined werden sollen
 		UnorderedKVEdgeConfig eConfig = UnorderedKVEdgeConfig
 				.newBuilder(Tuple.class.getName(), NullWritable.class.getName()).setFromConfiguration(tezConf).build();
-		Edge e1 = Edge.create(leftJoinVertex, hashJoinVertex, eConfig.createDefaultBroadcastEdgeProperty());
-		Edge e2 = Edge.create(rightJoinVertex, hashJoinVertex, eConfig.createDefaultBroadcastEdgeProperty());
+		// Edge e1 = Edge.create(leftJoinVertex, hashJoinVertex,
+		// eConfig.createDefaultBroadcastEdgeProperty());
+		// Edge e2 = Edge.create(rightJoinVertex, hashJoinVertex,
+		// eConfig.createDefaultBroadcastEdgeProperty());
+		Edge e1 = Edge.create(leftJoinVertex, hashJoinVertex, eConfig.createDefaultOneToOneEdgeProperty());
+		Edge e2 = Edge.create(rightJoinVertex, hashJoinVertex, eConfig.createDefaultOneToOneEdgeProperty());
 
 		// Vertex und zwei Edges in die jeweiligen Queues stecken
 		vertexQueue.add(hashJoinVertex);
@@ -222,14 +229,18 @@ public class DAGBuilder {
 
 		// HashJoin-Vertex erzeugen
 		Vertex newHashJoinVertex = Vertex.create("v" + ++vertexCount,
-				ProcessorDescriptor.create(HashJoinProcessor.class.getName()).setUserPayload(up), 1);
+				ProcessorDescriptor.create(HashJoinProcessor.class.getName()).setUserPayload(up));
 
 		// Join-Vertex mit zwei Edges an die jeweiligen Vertices koppeln, welche
 		// gejoined werden sollen
 		UnorderedKVEdgeConfig eConfig = UnorderedKVEdgeConfig
 				.newBuilder(Tuple.class.getName(), NullWritable.class.getName()).setFromConfiguration(tezConf).build();
-		Edge e1 = Edge.create(existingHashJoinVertex, newHashJoinVertex, eConfig.createDefaultBroadcastEdgeProperty());
-		Edge e2 = Edge.create(vertexToJoin, newHashJoinVertex, eConfig.createDefaultBroadcastEdgeProperty());
+		// Edge e1 = Edge.create(existingHashJoinVertex, newHashJoinVertex,
+		// eConfig.createDefaultBroadcastEdgeProperty());
+		// Edge e2 = Edge.create(vertexToJoin, newHashJoinVertex,
+		// eConfig.createDefaultBroadcastEdgeProperty());
+		Edge e1 = Edge.create(existingHashJoinVertex, newHashJoinVertex, eConfig.createDefaultOneToOneEdgeProperty());
+		Edge e2 = Edge.create(vertexToJoin, newHashJoinVertex, eConfig.createDefaultOneToOneEdgeProperty());
 
 		// Vertex und zwei Edges in die jeweiligen Queues stecken
 		vertexQueue.add(newHashJoinVertex);
@@ -240,7 +251,7 @@ public class DAGBuilder {
 	private void initializeSelectionVertex(TezConfiguration tezConf) {
 		// Selektionsknoten erzeugen und speichern
 		Vertex v = Vertex.create("v" + ++vertexCount,
-				ProcessorDescriptor.create(SelectionProcessor.class.getName()).setUserPayload(selectionParameter), 1);
+				ProcessorDescriptor.create(SelectionProcessor.class.getName()).setUserPayload(selectionParameter));
 		Vertex vertexToConnect = vertexQueue.getLast();
 		vertexQueue.add(v);
 
@@ -249,7 +260,9 @@ public class DAGBuilder {
 		UnorderedKVEdgeConfig eConfig = UnorderedKVEdgeConfig
 				.newBuilder(Tuple.class.getName(), NullWritable.class.getName()).setFromConfiguration(tezConf).build();
 		// Vertex vertexToConnect = vertexList.get(vertexList.size() - 2);
-		Edge e = Edge.create(vertexToConnect, v, eConfig.createDefaultBroadcastEdgeProperty());
+		// Edge e = Edge.create(vertexToConnect, v,
+		// eConfig.createDefaultBroadcastEdgeProperty());
+		Edge e = Edge.create(vertexToConnect, v, eConfig.createDefaultOneToOneEdgeProperty());
 
 		edgeQueue.add(e);
 	}
@@ -257,7 +270,7 @@ public class DAGBuilder {
 	private void initializeProjectionVertex(TezConfiguration tezConf) {
 		// Projektionsknoten erzeugen, speichern und mit DataSinks verknüpfen
 		Vertex v = Vertex.create("v" + ++vertexCount,
-				ProcessorDescriptor.create(ProjectionProcessor.class.getName()).setUserPayload(projectionParameter), 1);
+				ProcessorDescriptor.create(ProjectionProcessor.class.getName()).setUserPayload(projectionParameter));
 		v.addDataSink("OutputTable", outputTable);
 		v.addDataSink("OutputScheme", outputScheme);
 		Vertex vertexToConnect = vertexQueue.getLast();
@@ -268,7 +281,9 @@ public class DAGBuilder {
 		UnorderedKVEdgeConfig eConfig = UnorderedKVEdgeConfig
 				.newBuilder(Tuple.class.getName(), NullWritable.class.getName()).setFromConfiguration(tezConf).build();
 		// Vertex vertexToConnect = vertexList.get(vertexList.size() - 2);
-		Edge e = Edge.create(vertexToConnect, v, eConfig.createDefaultBroadcastEdgeProperty());
+		// Edge e = Edge.create(vertexToConnect, v,
+		// eConfig.createDefaultBroadcastEdgeProperty());
+		Edge e = Edge.create(vertexToConnect, v, eConfig.createDefaultOneToOneEdgeProperty());
 		edgeQueue.add(e);
 	}
 
