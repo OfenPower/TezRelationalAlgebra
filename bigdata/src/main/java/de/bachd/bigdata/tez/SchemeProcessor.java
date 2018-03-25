@@ -23,10 +23,12 @@ public class SchemeProcessor extends SimpleProcessor {
 		Preconditions.checkState(getInputs().size() == 1);
 		Preconditions.checkState(getOutputs().size() == 1);
 
-		KeyValueReader kvReader = (KeyValueReader) getInputs().values().iterator().next().getReader();
+		// KeyValueReader kvReader = (KeyValueReader)
+		// getInputs().values().iterator().next().getReader();
+		KeyValueReader kvReader = (KeyValueReader) getInputs().get("SchemeInput").getReader();
 		KeyValueWriter kvWriter = (KeyValueWriter) getOutputs().values().iterator().next().getWriter();
 		// Schema nach RelationName und Attribute aufsplitten
-		while (kvReader.next()) {
+		if (kvReader.next()) {
 			String schemeString = kvReader.getCurrentValue().toString();
 			System.out.println(schemeString);
 			Iterable<String> schemeItr = Splitter.on(';').trimResults().omitEmptyStrings().split(schemeString);
@@ -39,13 +41,6 @@ public class SchemeProcessor extends SimpleProcessor {
 				kvWriter.write(relationName, scheme);
 			}
 		}
-
-		/*
-		 * while (kvReader.next()) { Text scheme = new
-		 * Text(kvReader.getCurrentValue().toString()); NullWritable nullValue =
-		 * NullWritable.get(); kvWriter.write(scheme, nullValue); }
-		 */
-
 	}
 
 	@Override

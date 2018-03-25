@@ -1,0 +1,49 @@
+package de.bachd.bigdata.tez;
+
+import java.util.Iterator;
+
+import org.apache.hadoop.io.Text;
+import org.apache.tez.runtime.api.ProcessorContext;
+import org.apache.tez.runtime.library.api.KeyValueReader;
+import org.apache.tez.runtime.library.api.KeyValueWriter;
+import org.apache.tez.runtime.library.processor.SimpleProcessor;
+
+import com.google.common.base.Preconditions;
+import com.google.common.base.Splitter;
+
+public class SchemeProcessor extends SimpleProcessor {
+
+	public SchemeProcessor(ProcessorContext context) {
+		super(context);
+
+	}
+
+	@Override
+	public void run() throws Exception {
+		Preconditions.checkState(getInputs().size() == 1);
+		Preconditions.checkState(getOutputs().size() == 1);
+
+		KeyValueReader kvReader = (KeyValueReader) getInputs().values().iterator().next().getReader();
+		KeyValueWriter kvWriter = (KeyValueWriter) getOutputs().values().iterator().next().getWriter();
+		// Schema nach RelationName und Attribute aufsplitten
+		if (kvReader.next()) {
+			String schemeString = kvReader.getCurrentValue().toString();
+			System.out.println(schemeString);
+			Iterable<String> schemeItr = Splitter.on(';').trimResults().omitEmptyStrings().split(schemeString);
+			Iterator<String> schemeIterator = schemeItr.iterator();
+			while (schemeIterator.hasNext()) {
+				Text relationName = new Text(schemeIterator.next());
+				Text scheme = new Text(schemeIterator.next());
+				// Key = RelationName, Value = Attribute der Form
+				// "Name:Domäne \t Name:Domäne \t Name:Domäne"
+				kvWriter.write(relationName, scheme);
+			}
+		}
+	}
+
+	@Override
+	public void initialize() throws Exception {
+		System.out.println("Initialize SchemeProcessor");
+	}
+
+}

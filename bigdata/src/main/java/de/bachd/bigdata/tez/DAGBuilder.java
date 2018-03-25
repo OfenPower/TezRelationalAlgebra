@@ -128,7 +128,7 @@ public class DAGBuilder {
 					.setFromConfiguration(tezConf).build();
 			// Edge e1 = Edge.create(v1, v2,
 			// eConfig.createDefaultBroadcastEdgeProperty());
-			Edge e1 = Edge.create(v1, v2, eConfig.createDefaultOneToOneEdgeProperty());
+			Edge e1 = Edge.create(v1, v2, eConfig.createDefaultBroadcastEdgeProperty());
 			edgeQueue.add(e1);
 
 			// relation mit dem Namen des Vertex welcher diese Relation im

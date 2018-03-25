@@ -26,6 +26,7 @@ import com.google.common.base.Splitter;
  */
 public class ProjectionProcessor extends SimpleMRProcessor {
 
+	private boolean projectAllValues = false;
 	private List<String> projectionList = new ArrayList<>();
 
 	public ProjectionProcessor(ProcessorContext context) {
@@ -34,7 +35,7 @@ public class ProjectionProcessor extends SimpleMRProcessor {
 
 	@Override
 	public void run() throws Exception {
-		if (projectionList.contains("*")) {
+		if (projectAllValues) {
 			// SELECT * FROM
 			projectAllValues();
 		} else {
@@ -123,59 +124,14 @@ public class ProjectionProcessor extends SimpleMRProcessor {
 		for (String s : projItr) {
 			projectionList.add(s);
 		}
+		// Muss überhaupt projeziert werden?
+		if (projectionList.contains("*")) {
+			projectAllValues = true;
+		} else {
+			projectAllValues = false;
+		}
+
 		// DEBUG Projektionsattribute anzeigen
 		System.out.println("Projektion auf: " + projection);
 	}
-
-	private void backup() throws Exception {
-		KeyValueReader kvReader = (KeyValueReader) getInputs().values().iterator().next().getReader();
-		KeyValueWriter tableWriter = (KeyValueWriter) getOutputs().get("OutputTable").getWriter();
-		KeyValueWriter schemeWriter = (KeyValueWriter) getOutputs().get("OutputScheme").getWriter();
-		while (kvReader.next()) {
-			Tuple tuple = (Tuple) kvReader.getCurrentKey();
-			// Schema einmalig merken (wird am Ende rausgeschrieben)
-			// if (!schemeRead) {
-			// attributeNames = tuple.getAttributeNames();
-			// attributeDomains = tuple.getAttributeDomains();
-			// schemeRead = true;
-			// }
-			Text projectedValues = null;
-			// SELECT * FROM
-			// tuple.printColumnValues();
-			if (projectionList.contains("*")) {
-				// Alle Values rausschreiben
-				List<String> valueList = tuple.getAttributeValues();
-				StringBuilder values = new StringBuilder("");
-				for (int i = 0; i < valueList.size(); i++) {
-					values.append(valueList.get(i)).append("\t");
-				}
-				projectedValues = new Text(values.toString());
-			} else {
-				// SELECT a, b FROM
-				// tuple.printColumnValues();
-				Map<String, String> columnMap = tuple.getNamesValuesMap();
-				StringBuilder values = new StringBuilder("");
-				for (int i = 0; i < projectionList.size(); i++) {
-					// Projektionsattribut aus Liste holen
-					String column = projectionList.get(i);
-					// Nur Value für dieses Attribut rausschreiben
-					values.append(columnMap.get(column)).append("\t");
-				}
-				// values.delete(values.length() - 2, values.length());
-				projectedValues = new Text(values.toString());
-
-			}
-			// Projezierte Tupel herausschreiben
-			tableWriter.write(projectedValues, NullWritable.get());
-		}
-
-		// Ergebnisschema rausschreiben
-		StringBuilder sb = new StringBuilder();
-		// for (int i = 0; i < attributeNames.size(); i++) {
-		// sb.append(attributeNames.get(i) + ":" + attributeDomains.get(i) +
-		// "\t");
-		// }
-		schemeWriter.write(new Text(sb.toString()), NullWritable.get());
-	}
-
 }
