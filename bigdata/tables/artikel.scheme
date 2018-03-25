@@ -1,1 +1,1 @@
-artikel; anr:integer	name:string	preis:double
+artikel; anr:integer name:string preis:double

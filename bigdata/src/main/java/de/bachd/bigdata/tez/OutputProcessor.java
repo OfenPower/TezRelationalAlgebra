@@ -1,0 +1,56 @@
+package de.bachd.bigdata.tez;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+
+import org.apache.hadoop.io.NullWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.tez.mapreduce.processor.SimpleMRProcessor;
+import org.apache.tez.runtime.api.ProcessorContext;
+import org.apache.tez.runtime.library.api.KeyValueReader;
+import org.apache.tez.runtime.library.api.KeyValueWriter;
+
+public class OutputProcessor extends SimpleMRProcessor {
+
+	public OutputProcessor(ProcessorContext context) {
+		super(context);
+	}
+
+	@Override
+	public void run() throws Exception {
+		KeyValueReader kvReader = (KeyValueReader) getInputs().values().iterator().next().getReader();
+		KeyValueWriter tableWriter = (KeyValueWriter) getOutputs().get("OutputTable").getWriter();
+		KeyValueWriter schemeWriter = (KeyValueWriter) getOutputs().get("OutputScheme").getWriter();
+		List<String> attributeNames = new ArrayList<>();
+		List<String> attributeDomains = new ArrayList<>();
+		boolean schemeWritten = false;
+		while (kvReader.next()) {
+			Tuple tuple = (Tuple) kvReader.getCurrentKey();
+			if (!schemeWritten) { // Schema einmalig speichern
+				attributeNames = tuple.getAttributeNames();
+				attributeDomains = tuple.getAttributeDomains();
+				schemeWritten = true;
+			}
+			// Alle Values rausschreiben
+			List<String> valueList = tuple.getAttributeValues();
+			StringBuilder values = new StringBuilder("");
+			for (int i = 0; i < valueList.size(); i++) {
+				values.append(valueList.get(i)).append("\t");
+			}
+			tableWriter.write(new Text(values.toString()), NullWritable.get());
+		}
+
+		// Ergebnisschema rausschreiben
+		StringBuilder sb = new StringBuilder();
+		for (int i = 0; i < attributeNames.size(); i++) {
+			sb.append(attributeNames.get(i) + ":" + attributeDomains.get(i) + " ");
+		}
+		schemeWriter.write(new Text(sb.toString()), NullWritable.get());
+	}
+
+	@Override
+	public void initialize() throws IOException {
+		System.out.println("Initialize OutputProcessor");
+	}
+}

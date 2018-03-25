@@ -1,1 +1,1 @@
-professoren.name:string	vorlesungen.titel:string	
+professoren.persnr:integer professoren.name:string professoren.rang:string professoren.raum:string vorlesungen.vorlnr:integer vorlesungen.titel:string vorlesungen.sws:integer vorlesungen.gelesenvon:integer 

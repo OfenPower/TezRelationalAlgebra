@@ -39,7 +39,7 @@ public class TableProcessor extends SimpleMRProcessor {
 		if (kvSchemeReader.next()) {
 			Text relationName = (Text) kvSchemeReader.getCurrentKey();
 			Text scheme = (Text) kvSchemeReader.getCurrentValue();
-			Iterable<String> schemeValues = Splitter.on('\t').trimResults().omitEmptyStrings().split(scheme.toString());
+			Iterable<String> schemeValues = Splitter.on(' ').trimResults().omitEmptyStrings().split(scheme.toString());
 			List<String> attributeNameList = new ArrayList<>(); // Liste aller
 																// Attributnamen
 			List<String> attributeDomainList = new ArrayList<>(); // Liste aller

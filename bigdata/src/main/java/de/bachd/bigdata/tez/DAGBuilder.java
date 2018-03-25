@@ -32,6 +32,7 @@ import com.google.common.collect.Lists;
 public class DAGBuilder {
 
 	private boolean needSelection = false;
+	private boolean needProjection = false;
 
 	private UserPayload projectionParameter;
 	private UserPayload selectionParameter;
@@ -64,7 +65,11 @@ public class DAGBuilder {
 		if (needSelection) {
 			initializeSelectionVertex(tezConf);
 		}
-		initializeProjectionVertex(tezConf);
+		// Projektion benötigt?
+		if (needProjection) {
+			initializeProjectionVertex(tezConf);
+		}
+		initializeOutputVertex(tezConf);
 
 		// DAG zusammenbasteln
 		DAG dag = DAG.create("DAG");
@@ -271,6 +276,22 @@ public class DAGBuilder {
 		// Projektionsknoten erzeugen, speichern und mit DataSinks verknüpfen
 		Vertex v = Vertex.create("v" + ++vertexCount,
 				ProcessorDescriptor.create(ProjectionProcessor.class.getName()).setUserPayload(projectionParameter));
+		// v.addDataSink("OutputTable", outputTable);
+		// v.addDataSink("OutputScheme", outputScheme);
+		Vertex vertexToConnect = vertexQueue.getLast();
+		vertexQueue.add(v);
+
+		// Vorletzten Vertex der Liste holen und mit Projektionsknoten über Edge
+		// verknüpfen
+		UnorderedKVEdgeConfig eConfig = UnorderedKVEdgeConfig
+				.newBuilder(Tuple.class.getName(), NullWritable.class.getName()).setFromConfiguration(tezConf).build();
+		Edge e = Edge.create(vertexToConnect, v, eConfig.createDefaultOneToOneEdgeProperty());
+		edgeQueue.add(e);
+	}
+
+	private void initializeOutputVertex(TezConfiguration tezConf) {
+		// Projektionsknoten erzeugen, speichern und mit DataSinks verknüpfen
+		Vertex v = Vertex.create("v" + ++vertexCount, ProcessorDescriptor.create(OutputProcessor.class.getName()));
 		v.addDataSink("OutputTable", outputTable);
 		v.addDataSink("OutputScheme", outputScheme);
 		Vertex vertexToConnect = vertexQueue.getLast();
@@ -280,9 +301,6 @@ public class DAGBuilder {
 		// verknüpfen
 		UnorderedKVEdgeConfig eConfig = UnorderedKVEdgeConfig
 				.newBuilder(Tuple.class.getName(), NullWritable.class.getName()).setFromConfiguration(tezConf).build();
-		// Vertex vertexToConnect = vertexList.get(vertexList.size() - 2);
-		// Edge e = Edge.create(vertexToConnect, v,
-		// eConfig.createDefaultBroadcastEdgeProperty());
 		Edge e = Edge.create(vertexToConnect, v, eConfig.createDefaultOneToOneEdgeProperty());
 		edgeQueue.add(e);
 	}
@@ -292,9 +310,15 @@ public class DAGBuilder {
 		// SELECT-wort abschneiden
 		String projectionString = queryPart.substring(7);
 		System.out.println(projectionString);
-		Configuration conf = new Configuration();
-		conf.set("Projection", projectionString);
-		this.projectionParameter = TezUtils.createUserPayloadFromConf(conf);
+		// Muss projeziert werden?
+		if (!projectionString.trim().contains("*")) {
+			needProjection = true;
+			Configuration conf = new Configuration();
+			conf.set("Projection", projectionString);
+			this.projectionParameter = TezUtils.createUserPayloadFromConf(conf);
+		}
+		System.out.println("Projektion benötigt? " + needProjection);
+
 	}
 
 	private void setTablePayload(String queryPart) throws IOException {

@@ -1,0 +1,84 @@
+package de.bachd.bigdata.tez;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.io.NullWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.tez.common.TezUtils;
+import org.apache.tez.dag.api.UserPayload;
+import org.apache.tez.mapreduce.processor.SimpleMRProcessor;
+import org.apache.tez.runtime.api.ProcessorContext;
+import org.apache.tez.runtime.library.api.KeyValueReader;
+import org.apache.tez.runtime.library.api.KeyValueWriter;
+
+import com.google.common.base.Splitter;
+
+public class ProjectionProcessor extends SimpleMRProcessor {
+
+	private boolean projectAllValues = false;
+	private List<String> projectionList = new ArrayList<>();
+
+	public ProjectionProcessor(ProcessorContext context) {
+		super(context);
+	}
+
+	@Override
+	public void run() throws Exception {
+		KeyValueReader kvReader = (KeyValueReader) getInputs().values().iterator().next().getReader();
+		KeyValueWriter tableWriter = (KeyValueWriter) getOutputs().get("OutputTable").getWriter();
+		KeyValueWriter schemeWriter = (KeyValueWriter) getOutputs().get("OutputScheme").getWriter();
+		List<String> attributeNames = new ArrayList<>();
+		List<String> attributeDomains = new ArrayList<>();
+		boolean schemeRead = false;
+		while (kvReader.next()) {
+			Tuple tuple = (Tuple) kvReader.getCurrentKey();
+			if (!schemeRead) { // Schema einmalig speichern
+				attributeNames = tuple.getAttributeNames();
+				attributeDomains = tuple.getAttributeDomains();
+				schemeRead = true;
+			}
+			// Alle Values rausschreiben
+			List<String> valueList = tuple.getAttributeValues();
+			StringBuilder values = new StringBuilder("");
+			for (int i = 0; i < valueList.size(); i++) {
+				values.append(valueList.get(i)).append("\t");
+			}
+			tableWriter.write(new Text(values.toString()), NullWritable.get());
+		}
+
+		// Ergebnisschema rausschreiben
+		StringBuilder sb = new StringBuilder();
+		for (int i = 0; i < attributeNames.size(); i++) {
+			sb.append(attributeNames.get(i) + ":" + attributeDomains.get(i) + "\t");
+		}
+		schemeWriter.write(new Text(sb.toString()), NullWritable.get());
+	}
+
+	@Override
+	public void initialize() throws IOException {
+		System.out.println("Initialize ProjectionProcessor");
+		// UserPayload in Configuration konvertieren und Projektionsattribute
+		// holen
+		UserPayload up = getContext().getUserPayload();
+		Configuration conf = TezUtils.createConfFromUserPayload(up);
+		String projection = conf.get("Projection");
+		// Projektionsattribute splitten und einzeln der Projektionsliste
+		// hinzufügen.
+		Iterable<String> projItr = Splitter.on(',').trimResults().omitEmptyStrings().split(projection);
+		for (String s : projItr) {
+			projectionList.add(s);
+		}
+		// Muss überhaupt projeziert werden?
+		if (projectionList.contains("*")) {
+			projectAllValues = true;
+		} else {
+			projectAllValues = false;
+		}
+
+		// DEBUG Projektionsattribute anzeigen
+		System.out.println("Projektion auf: " + projection);
+	}
+}

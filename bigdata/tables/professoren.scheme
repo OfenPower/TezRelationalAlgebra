@@ -1,1 +1,1 @@
-professoren; persnr:integer	name:string	rang:string	raum:string
+professoren; persnr:integer name:string rang:string raum:string

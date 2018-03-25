@@ -1,1 +1,1 @@
-vorlesungen; vorlnr:integer	titel:string	sws:integer	gelesenvon:integer
+vorlesungen; vorlnr:integer titel:string sws:integer gelesenvon:integer

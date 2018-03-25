@@ -1,0 +1,84 @@
+package de.bachd.bigdata.tez;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.io.NullWritable;
+import org.apache.tez.common.TezUtils;
+import org.apache.tez.dag.api.UserPayload;
+import org.apache.tez.mapreduce.processor.SimpleMRProcessor;
+import org.apache.tez.runtime.api.ProcessorContext;
+import org.apache.tez.runtime.library.api.KeyValueReader;
+import org.apache.tez.runtime.library.api.KeyValueWriter;
+
+import com.google.common.base.Splitter;
+
+/**
+ * Erhält Tuple und projeziert diese auf angegebene Attribute. Schreibt Die
+ * Ergebniswerte als Datei raus.
+ * 
+ * ToDo: Auf "*" prüfen!
+ * 
+ */
+public class ProjectionProcessor extends SimpleMRProcessor {
+
+	private List<String> projectionList = new ArrayList<>();
+
+	public ProjectionProcessor(ProcessorContext context) {
+		super(context);
+	}
+
+	@Override
+	public void run() throws Exception {
+		// SELECT a, b FROM
+		KeyValueReader kvReader = (KeyValueReader) getInputs().values().iterator().next().getReader();
+		KeyValueWriter tableWriter = (KeyValueWriter) getOutputs().get("OutputTable").getWriter();
+		List<String> projectedAttributeNames = new ArrayList<>();
+		List<String> projectedAttributeDomains = new ArrayList<>();
+		List<String> projectedAttributeValues = new ArrayList<>();
+		boolean schemeRead = false; // für einmalige Schemaspeicherung
+		while (kvReader.next()) {
+			Tuple tuple = (Tuple) kvReader.getCurrentKey();
+			Map<String, String> namesValuesMap = tuple.getNamesValuesMap();
+			Map<String, String> namesDomainsMap = tuple.getNamesDomainsMap();
+			for (int i = 0; i < projectionList.size(); i++) {
+				// Projektionsattribut aus Liste holen
+				String attribute = projectionList.get(i);
+				// Attributwert des projezierten Attributs holen
+				String value = namesValuesMap.get(attribute);
+				projectedAttributeValues.add(value);
+				// Schema (einmalig) projezieren
+				if (!schemeRead) {
+					projectedAttributeNames.add(attribute);
+					projectedAttributeDomains.add(namesDomainsMap.get(attribute));
+				}
+			}
+			schemeRead = true;
+			Tuple projectedTuple = new Tuple();
+			projectedTuple.set(projectedAttributeNames, projectedAttributeDomains, projectedAttributeValues);
+			tableWriter.write(projectedTuple, NullWritable.get());
+		}
+	}
+
+	@Override
+	public void initialize() throws IOException {
+		System.out.println("Initialize ProjectionProcessor");
+		// UserPayload in Configuration konvertieren und Projektionsattribute
+		// holen
+		UserPayload up = getContext().getUserPayload();
+		Configuration conf = TezUtils.createConfFromUserPayload(up);
+		String projection = conf.get("Projection");
+		// Projektionsattribute splitten und einzeln der Projektionsliste
+		// hinzufügen.
+		Iterable<String> projItr = Splitter.on(',').trimResults().omitEmptyStrings().split(projection);
+		for (String s : projItr) {
+			projectionList.add(s);
+		}
+
+		// DEBUG Projektionsattribute anzeigen
+		System.out.println("Projektion auf: " + projection);
+	}
+}
