@@ -1,0 +1,1 @@
+artikel.anr:integer artikel.name:string count(liegen.lnr):integer sum(liegen.bestand):double 

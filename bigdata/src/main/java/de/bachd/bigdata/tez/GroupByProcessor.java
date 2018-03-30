@@ -36,11 +36,11 @@ public class GroupByProcessor extends SimpleProcessor {
 			Map<String, String> tupleColumnStringMap = tuple.getNamesValuesMap();
 			StringBuilder sb = new StringBuilder();
 			for (String attribute : groupByAttributeList) {
-				sb.append(tupleColumnStringMap.get(attribute));
-				sb.append(", ");
+				sb.append(tupleColumnStringMap.get(attribute) + ";");
+				// sb.append(", ");
 			}
 			// Letzten ", "-String aus StringBuilder löschen
-			sb.delete(sb.length() - 2, sb.length());
+			// sb.delete(sb.length() - 2, sb.length());
 			Text key = new Text(sb.toString());
 			System.out.println("GroupBy key: " + key.toString());
 			kvWriter.write(key, tuple);

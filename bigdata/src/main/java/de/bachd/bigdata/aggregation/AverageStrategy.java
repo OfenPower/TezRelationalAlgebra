@@ -6,12 +6,6 @@ public class AverageStrategy implements AggregationStrategy {
 	private double count;
 
 	public AverageStrategy() {
-		// neutrales Aggregat
-		setNeutral();
-	}
-
-	@Override
-	public void setNeutral() {
 		sum = 0.0;
 		count = 0.0;
 	}
@@ -35,6 +29,11 @@ public class AverageStrategy implements AggregationStrategy {
 	@Override
 	public String getResultDomain() {
 		return "double";
+	}
+
+	@Override
+	public AggregationStrategy cloneStrategy() {
+		return new AverageStrategy();
 	}
 
 }

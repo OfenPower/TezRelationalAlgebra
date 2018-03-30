@@ -5,12 +5,6 @@ public class SumStrategy implements AggregationStrategy {
 	private double sum;
 
 	public SumStrategy() {
-		// Neutrales Aggregat erzeugen
-		setNeutral();
-	}
-
-	@Override
-	public void setNeutral() {
 		sum = 0.0;
 	}
 
@@ -33,6 +27,11 @@ public class SumStrategy implements AggregationStrategy {
 	@Override
 	public String getResultDomain() {
 		return "double";
+	}
+
+	@Override
+	public AggregationStrategy cloneStrategy() {
+		return new SumStrategy();
 	}
 
 }

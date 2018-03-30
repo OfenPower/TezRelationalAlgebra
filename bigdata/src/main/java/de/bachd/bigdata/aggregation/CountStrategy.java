@@ -5,12 +5,6 @@ public class CountStrategy implements AggregationStrategy {
 	private int count;
 
 	public CountStrategy() {
-		// neutrales Aggregat
-		setNeutral();
-	}
-
-	@Override
-	public void setNeutral() {
 		count = 0;
 	}
 
@@ -32,6 +26,11 @@ public class CountStrategy implements AggregationStrategy {
 	@Override
 	public String getResultDomain() {
 		return "integer";
+	}
+
+	@Override
+	public AggregationStrategy cloneStrategy() {
+		return new CountStrategy();
 	}
 
 }

@@ -46,6 +46,7 @@ public class Main extends Configured implements Tool {
 		// DAG aus String erzeugen
 		DAGBuilder dagBuilder = new DAGBuilder();
 		DAG dag = dagBuilder.buildDAGFromString(query, tezConf);
+		// DAG dag2 = DAGTestBuilder.buildFullDAG(tezConf);
 
 		// TezClient starten
 		TezClient tezClient = TezClient.create("TezClient", tezConf);

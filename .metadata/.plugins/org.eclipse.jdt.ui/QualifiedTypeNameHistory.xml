@@ -10,4 +10,6 @@
 <fullyQualifiedTypeName name="java.util.Map"/>
 <fullyQualifiedTypeName name="org.apache.tez.dag.api.UserPayload"/>
 <fullyQualifiedTypeName name="org.apache.hadoop.io.DoubleWritable"/>
+<fullyQualifiedTypeName name="org.apache.tez.runtime.library.conf.OrderedPartitionedKVEdgeConfig"/>
+<fullyQualifiedTypeName name="org.apache.tez.runtime.library.partitioner.HashPartitioner"/>
 </qualifiedTypeNameHistroy>

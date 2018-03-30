@@ -101,9 +101,9 @@ public class DAGTestBuilder {
 				ProcessorDescriptor.create(SelectionProcessor.class.getName()).setUserPayload(selectionParameter), 1);
 		Vertex v7 = Vertex.create(PROJECTIONPROCESSOR,
 				ProcessorDescriptor.create(ProjectionProcessor.class.getName()).setUserPayload(projectionParameter), 1);
-		v1.addDataSource(ARTIKELSCHEMEINPUT, schemeSource1);
+		v1.addDataSource("SchemeInput", schemeSource1);
 		v2.addDataSource(ARTIKELDATAINPUT, dataSource1);
-		v3.addDataSource(LIEGENSCHEMEINPUT, schemeSource2);
+		v3.addDataSource("SchemeInput", schemeSource2);
 		v4.addDataSource(LIEGENDATAINPUT, dataSource2);
 		v7.addDataSink(RESULTOUTPUT, dataSink);
 		v7.addDataSink("ResultOutput2", dataSink2);

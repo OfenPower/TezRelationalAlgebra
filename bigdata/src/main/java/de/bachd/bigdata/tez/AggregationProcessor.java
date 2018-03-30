@@ -86,9 +86,8 @@ public class AggregationProcessor extends SimpleProcessor {
 				attributeDomains.add(aggregate.getResultDomain());
 				attributeValues.add("" + aggregatedValue);
 
-				// Aggregierten Wert zurücksetzen, damit dieser Wert für die
-				// neue Gruppe berechnet werden kann!
-				aggregate.setNeutral();
+				// Aggregat gegen neues Aggregat austauschen
+				pair.setLeft(aggregate.cloneStrategy());
 			}
 
 			// Ergebnistuple erzeugen.

@@ -23,7 +23,9 @@ import org.apache.tez.dag.api.UserPayload;
 import org.apache.tez.dag.api.Vertex;
 import org.apache.tez.mapreduce.input.MRInput;
 import org.apache.tez.mapreduce.output.MROutput;
+import org.apache.tez.runtime.library.conf.OrderedPartitionedKVEdgeConfig;
 import org.apache.tez.runtime.library.conf.UnorderedKVEdgeConfig;
+import org.apache.tez.runtime.library.partitioner.HashPartitioner;
 
 import com.google.common.base.CharMatcher;
 import com.google.common.base.Splitter;
@@ -31,11 +33,13 @@ import com.google.common.collect.Lists;
 
 public class DAGBuilder {
 
-	private boolean needSelection = false;
 	private boolean needProjection = false;
+	private boolean needSelection = false;
+	private boolean needGroup = false;
 
 	private UserPayload projectionParameter;
 	private UserPayload selectionParameter;
+	private UserPayload groupByParameter;
 	private UserPayload tableParameter;
 
 	private ArrayDeque<String> dataSourceQueue = new ArrayDeque<>();
@@ -64,6 +68,9 @@ public class DAGBuilder {
 		// Selektion benötigt?
 		if (needSelection) {
 			initializeSelectionVertex(tezConf);
+		}
+		if (needGroup) {
+			initializeGroupByAndAggregationVertex(tezConf);
 		}
 		// Projektion benötigt?
 		if (needProjection) {
@@ -103,6 +110,10 @@ public class DAGBuilder {
 			if (s.startsWith("WHERE")) {
 				setSelectionPayload(s);
 			}
+			// GroupByPayload initialisieren
+			if (s.startsWith("GROUP BY")) {
+				setGroupByPayload(s.substring(9));
+			}
 		}
 	}
 
@@ -125,7 +136,7 @@ public class DAGBuilder {
 			v2.addDataSource("DataInput", data);
 			vertexQueue.add(v1);
 			vertexQueue.add(v2);
-			System.out.println("Parallelism: " + v2.getParallelism());
+			// System.out.println("Parallelism: " + v2.getParallelism());
 
 			// Die erzeugten Vertices mit einer Edge verbinden und die Edge
 			// abspeichern
@@ -140,7 +151,8 @@ public class DAGBuilder {
 			// TableProcessor lädt in einer Map speichern (Bsp: <artikel, v2>,
 			// <lager, v4>))
 			relationVertexMap.put(dataSource, v2);
-			System.out.println("RelationVertex Eintrag: " + dataSource + " verarbeitet von Vertex: " + v2.getName());
+			// System.out.println("RelationVertex Eintrag: " + dataSource + "
+			// verarbeitet von Vertex: " + v2.getName());
 		}
 
 		// Zwei DataSinks erzeugen (1x für Ergebnisdaten und 1x für das
@@ -240,10 +252,6 @@ public class DAGBuilder {
 		// gejoined werden sollen
 		UnorderedKVEdgeConfig eConfig = UnorderedKVEdgeConfig
 				.newBuilder(Tuple.class.getName(), NullWritable.class.getName()).setFromConfiguration(tezConf).build();
-		// Edge e1 = Edge.create(existingHashJoinVertex, newHashJoinVertex,
-		// eConfig.createDefaultBroadcastEdgeProperty());
-		// Edge e2 = Edge.create(vertexToJoin, newHashJoinVertex,
-		// eConfig.createDefaultBroadcastEdgeProperty());
 		Edge e1 = Edge.create(existingHashJoinVertex, newHashJoinVertex, eConfig.createDefaultOneToOneEdgeProperty());
 		Edge e2 = Edge.create(vertexToJoin, newHashJoinVertex, eConfig.createDefaultOneToOneEdgeProperty());
 
@@ -268,8 +276,33 @@ public class DAGBuilder {
 		// Edge e = Edge.create(vertexToConnect, v,
 		// eConfig.createDefaultBroadcastEdgeProperty());
 		Edge e = Edge.create(vertexToConnect, v, eConfig.createDefaultOneToOneEdgeProperty());
-
 		edgeQueue.add(e);
+	}
+
+	private void initializeGroupByAndAggregationVertex(TezConfiguration tezConf) throws IOException {
+		// GroupByVertex erzeugen und mit letztem Knoten verbinden
+		Vertex groupByVertex = Vertex.create("v" + ++vertexCount,
+				ProcessorDescriptor.create(GroupByProcessor.class.getName()).setUserPayload(groupByParameter));
+		Vertex vertexToConnect = vertexQueue.getLast();
+		vertexQueue.add(groupByVertex);
+
+		UnorderedKVEdgeConfig eConfig1 = UnorderedKVEdgeConfig
+				.newBuilder(Tuple.class.getName(), NullWritable.class.getName()).setFromConfiguration(tezConf).build();
+		Edge e1 = Edge.create(vertexToConnect, groupByVertex, eConfig1.createDefaultOneToOneEdgeProperty());
+		edgeQueue.add(e1);
+
+		// Aggregationsvertex erzeugen und mit GroupBy-Knoten verbinden
+		Configuration conf = new Configuration();
+		conf.set("AggregateFunctions", "count(liegen.lnr), sum(liegen.bestand)");
+		UserPayload up = TezUtils.createUserPayloadFromConf(conf);
+
+		Vertex aggregateVertex = Vertex.create("v" + ++vertexCount,
+				ProcessorDescriptor.create(AggregationProcessor.class.getName()).setUserPayload(up), 1);
+		vertexQueue.add(aggregateVertex);
+		OrderedPartitionedKVEdgeConfig eConfig2 = OrderedPartitionedKVEdgeConfig
+				.newBuilder(Text.class.getName(), Tuple.class.getName(), HashPartitioner.class.getName()).build();
+		Edge e2 = Edge.create(groupByVertex, aggregateVertex, eConfig2.createDefaultEdgeProperty());
+		edgeQueue.add(e2);
 	}
 
 	private void initializeProjectionVertex(TezConfiguration tezConf) {
@@ -317,18 +350,18 @@ public class DAGBuilder {
 			conf.set("Projection", projectionString);
 			this.projectionParameter = TezUtils.createUserPayloadFromConf(conf);
 		}
-		System.out.println("Projektion benötigt? " + needProjection);
+		// System.out.println("Projektion benötigt? " + needProjection);
 
 	}
 
 	private void setTablePayload(String queryPart) throws IOException {
-		System.out.println("---- setTableConfiguration ----");
+		// System.out.println("---- setTableConfiguration ----");
 		List<String> queryParts = Lists
 				.newArrayList(Splitter.on(' ').trimResults().omitEmptyStrings().split(queryPart));
-		for (String s : queryParts) {
-			System.out.print(s + " ");
-		}
-		System.out.println();
+		// for (String s : queryParts) {
+		// System.out.print(s + " ");
+		// }
+		// System.out.println();
 		// Name der Source-Relation speichern
 		this.dataSourceQueue.add(queryParts.get(1));
 		// Muss eine Relation umbenannt werden?
@@ -345,10 +378,10 @@ public class DAGBuilder {
 	}
 
 	private void setSelectionPayload(String queryPart) throws IOException {
-		System.out.println("---- setSelectionConfiguration ----");
+		// System.out.println("---- setSelectionConfiguration ----");
 		// WHERE-wort abschneiden
 		String selectionString = queryPart.substring(6);
-		System.out.println(selectionString);
+		// System.out.println(selectionString);
 		Configuration conf = new Configuration();
 		conf.set("SelectionPredicate", selectionString);
 		this.selectionParameter = TezUtils.createUserPayloadFromConf(conf);
@@ -356,31 +389,31 @@ public class DAGBuilder {
 								// zu erzeugen
 	}
 
+	private void setGroupByPayload(String queryPart) throws IOException {
+		Configuration conf = new Configuration();
+		conf.set("GroupByAttributes", queryPart);
+		this.groupByParameter = TezUtils.createUserPayloadFromConf(conf);
+		needGroup = true; // flag setzen, um später einen GroupBy und
+							// Aggregations-Vertex zu erzeugen
+	}
+
 	private void prepareJoinInformation(String queryPart) throws IOException {
-		System.out.println("---- setJoinConfiguration ----");
+		// System.out.println("---- setJoinConfiguration ----");
 		// System.out.println(queryPart);
 		List<String> queryParts = Lists
 				.newArrayList(Splitter.on(' ').trimResults().omitEmptyStrings().limit(3).split(queryPart));
-		for (String s : queryParts) {
-			System.out.println(s);
-		}
+		// for (String s : queryParts) {
+		// System.out.println(s);
+		// }
 
 		// Neue Relation soll gejoined werden => in dataSourceQueue packen und
 		// das dazugehörige Joinattribut speichern
 		dataSourceQueue.add(queryParts.get(0));
 		relationJoinattributeMap.put(queryParts.get(0), queryParts.get(2));
-		System.out.println(
-				"Zu joinende Relation: " + queryParts.get(0) + " mit folgendem Joinattribut: " + queryParts.get(2));
+		// System.out.println(
+		// "Zu joinende Relation: " + queryParts.get(0) + " mit folgendem
+		// Joinattribut: " + queryParts.get(2));
 	}
-
-	/*
-	 * private void setGroupByConfiguration(String queryPart) {
-	 * System.out.println("---- setGroupByConfiguration ----"); List<String>
-	 * queryParts = Lists .newArrayList(Splitter.on('
-	 * ').trimResults().omitEmptyStrings().limit(3).split(queryPart));
-	 * System.out.println(queryParts.get(2));
-	 * this.groupByConfiguration.set("GroupByAttributes", queryParts.get(2)); }
-	 */
 
 	private void aggregate() {
 		// AggregationConfiguration
