@@ -21,11 +21,10 @@ JOIN vorlesungen ON professoren.persnr = vorlesungen.gelesenvon
 WHERE vorlesungen.titel = Mäeutik
 
 // GroupBy und Aggregation
-SELECT artikel.ArtNr, artikel.ArtName, count(liegen.LagerNr), sum(liegen.Bestand)
+SELECT artikel.anr, artikel.name, count(liegen.lnr), sum(liegen.bestand)
 FROM artikel 
-JOIN liegen ON artikel.ArtNr = liegen.ArtNr
-WHERE artikel.ArtNr != 1003
-GROUP BY artikel.ArtNr, artikel.ArtName
-
+JOIN liegen ON artikel.anr = liegen.anr
+WHERE artikel.anr != 1003
+GROUP BY artikel.anr, artikel.name
 
 

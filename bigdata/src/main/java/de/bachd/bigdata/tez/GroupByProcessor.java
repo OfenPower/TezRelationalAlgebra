@@ -32,7 +32,7 @@ public class GroupByProcessor extends SimpleProcessor {
 			// als groupBy-key verwenden. Anhand dieses keys werden die Tuple an
 			// der ausgehenden OrderedPartitionedEdge partitioniert und
 			// gruppiert!
-			Tuple tuple = (Tuple) kvReader.getCurrentKey();
+			Tuple tuple = (Tuple) kvReader.getCurrentValue();
 			Map<String, String> tupleColumnStringMap = tuple.getNamesValuesMap();
 			StringBuilder sb = new StringBuilder();
 			for (String attribute : groupByAttributeList) {

@@ -26,8 +26,9 @@ public class OutputProcessor extends SimpleMRProcessor {
 		List<String> attributeDomains = new ArrayList<>();
 		boolean schemeWritten = false;
 		while (kvReader.next()) {
-			Tuple tuple = (Tuple) kvReader.getCurrentKey();
-			if (!schemeWritten) { // Schema einmalig speichern
+			Tuple tuple = (Tuple) kvReader.getCurrentValue();
+			// Schema einmalig speichern
+			if (!schemeWritten) {
 				attributeNames = tuple.getAttributeNames();
 				attributeDomains = tuple.getAttributeDomains();
 				schemeWritten = true;

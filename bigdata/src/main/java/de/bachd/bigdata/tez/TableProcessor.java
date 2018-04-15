@@ -4,8 +4,10 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
-import org.apache.hadoop.io.NullWritable;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.Text;
+import org.apache.tez.common.TezUtils;
+import org.apache.tez.dag.api.UserPayload;
 import org.apache.tez.mapreduce.processor.SimpleMRProcessor;
 import org.apache.tez.runtime.api.LogicalInput;
 import org.apache.tez.runtime.api.ProcessorContext;
@@ -17,6 +19,7 @@ import com.google.common.base.Splitter;
 public class TableProcessor extends SimpleMRProcessor {
 
 	private String newRelationName;
+	private String sortAttribute;
 
 	public TableProcessor(ProcessorContext context) {
 		super(context);
@@ -24,16 +27,15 @@ public class TableProcessor extends SimpleMRProcessor {
 
 	@Override
 	public void run() throws Exception {
+		// erster Mapeintrag enthält Inputdaten aus .addDataSource()
 		Iterator<LogicalInput> kvReaderItr = getInputs().values().iterator();
-		KeyValueWriter kvTableWriter = (KeyValueWriter) getOutputs().values().iterator().next().getWriter();
-		// erster Mapeintrag ist DATAINPUT, wurde mit .addDataSource()
-		// eingetragen
 		KeyValueReader kvSchemeReader = null;
 		KeyValueReader kvDataReader = null;
 		while (kvReaderItr.hasNext()) {
 			kvDataReader = (KeyValueReader) kvReaderItr.next().getReader();
 			kvSchemeReader = (KeyValueReader) kvReaderItr.next().getReader();
 		}
+		KeyValueWriter kvTableWriter = (KeyValueWriter) getOutputs().values().iterator().next().getWriter();
 		// Schema lesen, Daten lesen, splitten und als Tuple
 		// speichern. Output: (Tuple, Schema)
 		if (kvSchemeReader.next()) {
@@ -76,8 +78,8 @@ public class TableProcessor extends SimpleMRProcessor {
 				// rausschreiben
 				Tuple tuple = new Tuple();
 				tuple.set(attributeNameList, attributeDomainList, attributeValueList);
-				NullWritable nullValue = NullWritable.get();
-				kvTableWriter.write(tuple, nullValue);
+				Text key = new Text(tuple.getNamesValuesMap().get(this.sortAttribute));
+				kvTableWriter.write(key, tuple);
 			}
 		}
 	}
@@ -85,9 +87,10 @@ public class TableProcessor extends SimpleMRProcessor {
 	@Override
 	public void initialize() throws Exception {
 		System.out.println("Initialize TableProcessor");
-		// UserPayload up = getContext().getUserPayload();
-		// Configuration conf = TezUtils.createConfFromUserPayload(up);
-		// this.newRelationName = conf.get("NewRelationRename");
+		UserPayload up = getContext().getUserPayload();
+		Configuration conf = TezUtils.createConfFromUserPayload(up);
+		this.sortAttribute = conf.get("SortAttribute");
+		System.out.println("Sort by: " + sortAttribute);
 
 	}
 }

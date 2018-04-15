@@ -95,10 +95,7 @@ public class AggregationProcessor extends SimpleProcessor {
 			aggregatedTuple.set(attributeNames, attributeDomains, attributeValues);
 			// DEBUG
 			aggregatedTuple.printColumnValues();
-			NullWritable nullValue = NullWritable.get();
-			kvWriter.write(aggregatedTuple, nullValue); // Tuple an
-														// ProjectionProcessor
-														// rausschreiben
+			kvWriter.write(NullWritable.get(), aggregatedTuple);
 			System.out.println("---------------");
 
 		}

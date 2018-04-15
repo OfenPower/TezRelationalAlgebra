@@ -1,0 +1,55 @@
+package de.bachd.bigdata.tez;
+
+import org.apache.hadoop.io.Text;
+import org.apache.tez.runtime.api.ProcessorContext;
+import org.apache.tez.runtime.library.api.KeyValueWriter;
+import org.apache.tez.runtime.library.api.KeyValuesReader;
+import org.apache.tez.runtime.library.processor.SimpleProcessor;
+
+public class MergeJoinProcessor extends SimpleProcessor {
+
+	private String leftJoinVertexName;
+	private String rightJoinVertexName;
+	private String leftJoinAttribute;
+	private String rightJoinAttribute;
+
+	public MergeJoinProcessor(ProcessorContext context) {
+		super(context);
+	}
+
+	@Override
+	public void run() throws Exception {
+		// KeyValueReader und Writer initialisieren
+		KeyValuesReader kvsReader1 = (KeyValuesReader) getInputs().get(leftJoinVertexName).getReader();
+		KeyValuesReader kvsReader2 = (KeyValuesReader) getInputs().get(rightJoinVertexName).getReader();
+		KeyValueWriter kvWriter = (KeyValueWriter) getOutputs().values().iterator().next().getWriter();
+
+		while (kvsReader1.next() && kvsReader2.next()) {
+			// Werte der Joinattribute holen
+			Text value1 = (Text) kvsReader1.getCurrentKey();
+			Text value2 = (Text) kvsReader2.getCurrentKey();
+
+			// Solange die Keys unterschiedlich sind, werden die beiden Zeiger
+			// weiter bewegt
+			while (value1.compareTo(value2) != 0) {
+
+				// value1 < value2
+				if (value1.compareTo(value2) < 0) {
+					if (kvsReader1.next()) {
+						value1 = (Text) kvsReader1.getCurrentKey();
+					}
+				}
+			}
+
+			// Join durchführen!
+
+		}
+
+	}
+
+	@Override
+	public void initialize() {
+		System.out.println("Initialize MergeJoinProcessor");
+	}
+
+}

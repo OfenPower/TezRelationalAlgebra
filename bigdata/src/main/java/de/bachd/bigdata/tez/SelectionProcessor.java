@@ -34,14 +34,13 @@ public class SelectionProcessor extends SimpleProcessor {
 		KeyValueReader kvReader = (KeyValueReader) getInputs().values().iterator().next().getReader();
 		KeyValueWriter kvWriter = (KeyValueWriter) getOutputs().values().iterator().next().getWriter();
 		while (kvReader.next()) {
-			Tuple tuple = (Tuple) kvReader.getCurrentKey();
-			NullWritable nullValue = NullWritable.get();
+			Tuple tuple = (Tuple) kvReader.getCurrentValue();
 			// Tuple nach Prädikat selektieren und an Projektionsprozessor
 			// weiterreichen
 			if (selectionPredicate.test(tuple)) {
 				// DEBUG selektierte Tupel anzeigen
 				tuple.printColumnValues();
-				kvWriter.write(tuple, nullValue);
+				kvWriter.write(NullWritable.get(), tuple);
 			}
 		}
 	}

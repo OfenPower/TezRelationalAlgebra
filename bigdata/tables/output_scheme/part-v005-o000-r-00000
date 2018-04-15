@@ -1,0 +1,1 @@
+artikel.anr:integer artikel.name:string artikel.preis:double liegen.anr:integer liegen.lnr:integer liegen.bestand:integer 

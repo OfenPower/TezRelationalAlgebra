@@ -1,0 +1,347 @@
+package de.bachd.bigdata.tez;
+
+import java.io.IOException;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.io.NullWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
+import org.apache.tez.common.TezUtils;
+import org.apache.tez.dag.api.DAG;
+import org.apache.tez.dag.api.DataSinkDescriptor;
+import org.apache.tez.dag.api.DataSourceDescriptor;
+import org.apache.tez.dag.api.Edge;
+import org.apache.tez.dag.api.ProcessorDescriptor;
+import org.apache.tez.dag.api.TezConfiguration;
+import org.apache.tez.dag.api.UserPayload;
+import org.apache.tez.dag.api.Vertex;
+import org.apache.tez.mapreduce.input.MRInput;
+import org.apache.tez.mapreduce.output.MROutput;
+import org.apache.tez.runtime.library.conf.OrderedPartitionedKVEdgeConfig;
+import org.apache.tez.runtime.library.conf.UnorderedKVEdgeConfig;
+import org.apache.tez.runtime.library.partitioner.HashPartitioner;
+
+public class DAGTestBuilder {
+
+	public static final String ARTIKELDATAINPUT = "ArtikelDataInput";
+	public static final String ARTIKELSCHEMEINPUT = "ArtikelSchemeInput";
+	public static final String LIEGENDATAINPUT = "LiegenDataInput";
+	public static final String LIEGENSCHEMEINPUT = "LiegenSchemeInput";
+	public static final String RESULTOUTPUT = "ResultOutput";
+	public static final String ARTIKELTABLEPROCESSOR = "ArtikelTableProcessor";
+	public static final String ARTIKELSCHEMEPROCESSOR = "ArtikelSchemeProcessor";
+	public static final String LIEGENTABLEPROCESSOR = "LiegenTableProcessor";
+	public static final String LIEGENSCHEMEPROCESSOR = "LiegenSchemeProcessor";
+	public static final String HASHJOINPROCESSOR = "HashJoinProcessor";
+	public static final String SELECTIONPROCESSOR = "SelectionProcessor";
+	public static final String GROUPBYPROCESSOR = "GroupByProcessor";
+	public static final String PROJECTIONPROCESSOR = "ProjectionProcessor";
+	public static final String AGGREGATIONPROCESSOR = "AggregationProcessor";
+
+	public static DAG buildJoinDAG(TezConfiguration tezConf) throws IOException {
+
+		// Name der Relationen aus args[] entnehmen
+		String r1 = "artikel";
+		String r2 = "liegen";
+
+		// DataSource und DataSinks erzeugen
+		DataSourceDescriptor dataSource1 = MRInput
+				.createConfigBuilder(new Configuration(tezConf), TextInputFormat.class, "./tables/" + r1).build();
+		DataSourceDescriptor schemeSource1 = MRInput
+				.createConfigBuilder(new Configuration(tezConf), TextInputFormat.class, "./tables/" + r1 + ".scheme")
+				.build();
+		DataSourceDescriptor dataSource2 = MRInput
+				.createConfigBuilder(new Configuration(tezConf), TextInputFormat.class, "./tables/" + r2).build();
+		DataSourceDescriptor schemeSource2 = MRInput
+				.createConfigBuilder(new Configuration(tezConf), TextInputFormat.class, "./tables/" + r2 + ".scheme")
+				.build();
+		DataSinkDescriptor dataSink = MROutput
+				.createConfigBuilder(new Configuration(tezConf), TextOutputFormat.class, "./tables/output_table")
+				.build();
+		DataSinkDescriptor dataSink2 = MROutput
+				.createConfigBuilder(new Configuration(tezConf), TextOutputFormat.class, "./tables/output_scheme")
+				.build();
+
+		// Join
+		String joinAttribute = "v1.Nachfolger = v2.Vorgänger";
+		Configuration joinConf = new Configuration();
+		joinConf.set("JoinAttribute", joinAttribute);
+		UserPayload joinParameter = TezUtils.createUserPayloadFromConf(joinConf);
+		// Selektion
+		String selectionPredicate = "v2.Nachfolger = 5216";
+		Configuration selectionConf = new Configuration();
+		selectionConf.set("SelectionPredicate", selectionPredicate);
+		UserPayload selectionParameter = TezUtils.createUserPayloadFromConf(selectionConf);
+		// Projektion
+		String projection = "v1.Vorgänger";
+		Configuration projectionConf = new Configuration();
+		projectionConf.set("Projection", projection);
+		UserPayload projectionParameter = TezUtils.createUserPayloadFromConf(projectionConf);
+
+		// Vertices
+		Vertex v1 = Vertex.create(ARTIKELSCHEMEPROCESSOR, ProcessorDescriptor.create(SchemeProcessor.class.getName()));
+		Vertex v2 = Vertex.create(ARTIKELTABLEPROCESSOR,
+				ProcessorDescriptor.create(TableProcessor.class.getName()).setUserPayload(tableParameter1));
+		Vertex v3 = Vertex.create(LIEGENSCHEMEPROCESSOR, ProcessorDescriptor.create(SchemeProcessor.class.getName()));
+		Vertex v4 = Vertex.create(LIEGENTABLEPROCESSOR,
+				ProcessorDescriptor.create(TableProcessor.class.getName()).setUserPayload(tableParameter2));
+		Vertex v5 = Vertex.create(HASHJOINPROCESSOR,
+				ProcessorDescriptor.create(HashJoinProcessor.class.getName()).setUserPayload(joinParameter), 1);
+		Vertex v6 = Vertex.create(SELECTIONPROCESSOR,
+				ProcessorDescriptor.create(SelectionProcessor.class.getName()).setUserPayload(selectionParameter), 1);
+		Vertex v7 = Vertex.create(PROJECTIONPROCESSOR,
+				ProcessorDescriptor.create(ProjectionProcessor.class.getName()).setUserPayload(projectionParameter), 1);
+		v1.addDataSource("SchemeInput", schemeSource1);
+		v2.addDataSource(ARTIKELDATAINPUT, dataSource1);
+		v3.addDataSource("SchemeInput", schemeSource2);
+		v4.addDataSource(LIEGENDATAINPUT, dataSource2);
+		v7.addDataSink(RESULTOUTPUT, dataSink);
+		v7.addDataSink("ResultOutput2", dataSink2);
+
+		// Edges erzeugen:
+		UnorderedKVEdgeConfig eConfig1 = UnorderedKVEdgeConfig.newBuilder(Text.class.getName(), Text.class.getName())
+				.setFromConfiguration(tezConf).build();
+		Edge e1 = Edge.create(v1, v2, eConfig1.createDefaultBroadcastEdgeProperty());
+		Edge e2 = Edge.create(v3, v4, eConfig1.createDefaultBroadcastEdgeProperty());
+		UnorderedKVEdgeConfig eConfig2 = UnorderedKVEdgeConfig
+				.newBuilder(Tuple.class.getName(), NullWritable.class.getName()).setFromConfiguration(tezConf).build();
+		Edge e3 = Edge.create(v2, v5, eConfig2.createDefaultBroadcastEdgeProperty());
+		Edge e4 = Edge.create(v4, v5, eConfig2.createDefaultBroadcastEdgeProperty());
+		Edge e5 = Edge.create(v5, v6, eConfig2.createDefaultBroadcastEdgeProperty());
+		Edge e6 = Edge.create(v6, v7, eConfig2.createDefaultBroadcastEdgeProperty());
+
+		// Graph aufbauen und starten
+		DAG dag = DAG.create("dag");
+		dag.addVertex(v1).addVertex(v2).addVertex(v3).addVertex(v4).addVertex(v5).addVertex(v6).addVertex(v7)
+				.addEdge(e1).addEdge(e2).addEdge(e3).addEdge(e4).addEdge(e5).addEdge(e6);
+
+		return dag;
+	}
+
+	public static DAG buildSelfJoinDAG(TezConfiguration tezConf) throws IOException {
+
+		// Name der Relationen aus args[] entnehmen
+		String r1 = "voraussetzen";
+		String r2 = "voraussetzen";
+		// DataSource und DataSinks erzeugen
+		DataSourceDescriptor dataSource1 = MRInput
+				.createConfigBuilder(new Configuration(tezConf), TextInputFormat.class, "./tables/" + r1).build();
+		DataSourceDescriptor schemeSource1 = MRInput
+				.createConfigBuilder(new Configuration(tezConf), TextInputFormat.class, "./tables/" + r1 + ".scheme")
+				.build();
+		DataSourceDescriptor dataSource2 = MRInput
+				.createConfigBuilder(new Configuration(tezConf), TextInputFormat.class, "./tables/" + r2).build();
+		DataSourceDescriptor schemeSource2 = MRInput
+				.createConfigBuilder(new Configuration(tezConf), TextInputFormat.class, "./tables/" + r2 + ".scheme")
+				.build();
+		DataSinkDescriptor dataSink = MROutput
+				.createConfigBuilder(new Configuration(tezConf), TextOutputFormat.class, "./tables/output_table")
+				.build();
+		DataSinkDescriptor dataSink2 = MROutput
+				.createConfigBuilder(new Configuration(tezConf), TextOutputFormat.class, "./tables/output_scheme")
+				.build();
+
+		// Table1
+		String table1 = "v1";
+		Configuration renameConf1 = new Configuration();
+		renameConf1.set("RelationRename", table1);
+		UserPayload tableParameter1 = TezUtils.createUserPayloadFromConf(renameConf1);
+		// Table2
+		String table2 = "v2";
+		Configuration renameConf2 = new Configuration();
+		renameConf2.set("RelationRename", table2);
+		UserPayload tableParameter2 = TezUtils.createUserPayloadFromConf(renameConf2);
+		// Join
+		String joinAttribute = "v1.Nachfolger = v2.Vorgänger";
+		Configuration joinConf = new Configuration();
+		joinConf.set("JoinAttribute", joinAttribute);
+		UserPayload joinParameter = TezUtils.createUserPayloadFromConf(joinConf);
+		// Selektion
+		String selectionPredicate = "v2.Nachfolger = 5216";
+		Configuration selectionConf = new Configuration();
+		selectionConf.set("SelectionPredicate", selectionPredicate);
+		UserPayload selectionParameter = TezUtils.createUserPayloadFromConf(selectionConf);
+		// Projektion
+		String projection = "v1.Vorgänger";
+		Configuration projectionConf = new Configuration();
+		projectionConf.set("Projection", projection);
+		UserPayload projectionParameter = TezUtils.createUserPayloadFromConf(projectionConf);
+
+		// Vertices
+		Vertex v1 = Vertex.create(ARTIKELSCHEMEPROCESSOR, ProcessorDescriptor.create(SchemeProcessor.class.getName()));
+		Vertex v2 = Vertex.create(ARTIKELTABLEPROCESSOR,
+				ProcessorDescriptor.create(TableProcessor.class.getName()).setUserPayload(tableParameter1));
+		Vertex v3 = Vertex.create(LIEGENSCHEMEPROCESSOR, ProcessorDescriptor.create(SchemeProcessor.class.getName()));
+		Vertex v4 = Vertex.create(LIEGENTABLEPROCESSOR,
+				ProcessorDescriptor.create(TableProcessor.class.getName()).setUserPayload(tableParameter2));
+		Vertex v5 = Vertex.create(HASHJOINPROCESSOR,
+				ProcessorDescriptor.create(HashJoinProcessor.class.getName()).setUserPayload(joinParameter), 1);
+		Vertex v6 = Vertex.create(SELECTIONPROCESSOR,
+				ProcessorDescriptor.create(SelectionProcessor.class.getName()).setUserPayload(selectionParameter), 1);
+		Vertex v7 = Vertex.create(PROJECTIONPROCESSOR,
+				ProcessorDescriptor.create(ProjectionProcessor.class.getName()).setUserPayload(projectionParameter), 1);
+		v1.addDataSource("SchemeInput", schemeSource1);
+		v2.addDataSource(ARTIKELDATAINPUT, dataSource1);
+		v3.addDataSource("SchemeInput", schemeSource2);
+		v4.addDataSource(LIEGENDATAINPUT, dataSource2);
+		v7.addDataSink(RESULTOUTPUT, dataSink);
+		v7.addDataSink("ResultOutput2", dataSink2);
+
+		// Edges erzeugen:
+		UnorderedKVEdgeConfig eConfig1 = UnorderedKVEdgeConfig.newBuilder(Text.class.getName(), Text.class.getName())
+				.setFromConfiguration(tezConf).build();
+		Edge e1 = Edge.create(v1, v2, eConfig1.createDefaultBroadcastEdgeProperty());
+		Edge e2 = Edge.create(v3, v4, eConfig1.createDefaultBroadcastEdgeProperty());
+		UnorderedKVEdgeConfig eConfig2 = UnorderedKVEdgeConfig
+				.newBuilder(Tuple.class.getName(), NullWritable.class.getName()).setFromConfiguration(tezConf).build();
+		Edge e3 = Edge.create(v2, v5, eConfig2.createDefaultBroadcastEdgeProperty());
+		Edge e4 = Edge.create(v4, v5, eConfig2.createDefaultBroadcastEdgeProperty());
+		Edge e5 = Edge.create(v5, v6, eConfig2.createDefaultBroadcastEdgeProperty());
+		Edge e6 = Edge.create(v6, v7, eConfig2.createDefaultBroadcastEdgeProperty());
+
+		// Graph aufbauen und starten
+		DAG dag = DAG.create("dag");
+		dag.addVertex(v1).addVertex(v2).addVertex(v3).addVertex(v4).addVertex(v5).addVertex(v6).addVertex(v7)
+				.addEdge(e1).addEdge(e2).addEdge(e3).addEdge(e4).addEdge(e5).addEdge(e6);
+
+		return dag;
+	}
+
+	public static DAG buildFullDAG(TezConfiguration tezConf) throws IOException {
+		// Name der Relationen aus args[] entnehmen
+		String r1 = "artikel";
+		String r2 = "liegen";
+
+		// DataSource und DataSinks erzeugen
+		DataSourceDescriptor dataSource1 = MRInput
+				.createConfigBuilder(new Configuration(tezConf), TextInputFormat.class, "./tables/" + r1).build();
+		DataSourceDescriptor schemeSource1 = MRInput
+				.createConfigBuilder(new Configuration(tezConf), TextInputFormat.class, "./tables/" + r1 + ".scheme")
+				.build();
+		DataSourceDescriptor dataSource2 = MRInput
+				.createConfigBuilder(new Configuration(tezConf), TextInputFormat.class, "./tables/" + r2).build();
+		DataSourceDescriptor schemeSource2 = MRInput
+				.createConfigBuilder(new Configuration(tezConf), TextInputFormat.class, "./tables/" + r2 + ".scheme")
+				.build();
+		DataSinkDescriptor dataSink = MROutput
+				.createConfigBuilder(new Configuration(tezConf), TextOutputFormat.class, "./tables/output_table")
+				.build();
+
+		// Configuration-Objekte für jeweilige Prozessoren erzeugen
+		// ---------------------------------------------------------
+		// Table
+		String table1 = "v1";
+		Configuration renameConf1 = new Configuration();
+		renameConf1.set("RelationRename", table1);
+		UserPayload tableParameter1 = TezUtils.createUserPayloadFromConf(renameConf1);
+		// Join
+		String joinAttribute = "artikel.ArtNr = liegen.ArtNr";
+		Configuration joinConf = new Configuration();
+		joinConf.set("JoinAttribute", joinAttribute);
+		UserPayload joinParameter = TezUtils.createUserPayloadFromConf(joinConf);
+		// Selektion
+		String selectionPredicate = "artikel.ArtNr != 1003";
+		Configuration selectionConf = new Configuration();
+		selectionConf.set("SelectionPredicate", selectionPredicate);
+		UserPayload selectionParameter = TezUtils.createUserPayloadFromConf(selectionConf);
+		// GroupBy
+		String groupByAttributes = "artikel.ArtNr, artikel.ArtName";
+		Configuration groupByConf = new Configuration();
+		groupByConf.set("GroupByAttributes", groupByAttributes);
+		UserPayload groupByParameter = TezUtils.createUserPayloadFromConf(groupByConf);
+		// AggregateProjectionProcessor
+		String aggregateFunctions = "count(liegen.LagerNr), sum(liegen.Bestand)";
+		Configuration aggregationConf = new Configuration();
+		aggregationConf.set("AggregateFunctions", aggregateFunctions);
+		UserPayload aggregationParameter = TezUtils.createUserPayloadFromConf(aggregationConf);
+		// Projektion
+		String projection = "artikel.ArtNr, artikel.ArtName, count(liegen.LagerNr), sum(liegen.Bestand)";
+		Configuration projectionConf = new Configuration();
+		projectionConf.set("Projection", projection);
+		UserPayload projectionParameter = TezUtils.createUserPayloadFromConf(projectionConf);
+
+		// Knoten erzeugen. Prädikat und Projectionattribute über UserPayload
+		// als String an SelectionProcessor und ProjectionProcessor
+		// weiterreichen
+		Vertex v1 = Vertex.create("ArtikelSchemeProcessor",
+				ProcessorDescriptor.create(SchemeProcessor.class.getName()));
+		Vertex v2 = Vertex.create("ArtikelTableProcessor", ProcessorDescriptor.create(TableProcessor.class.getName()));
+		Vertex v3 = Vertex.create("LiegenSchemeProcessor", ProcessorDescriptor.create(SchemeProcessor.class.getName()));
+		Vertex v4 = Vertex.create("LiegenTableProcessor", ProcessorDescriptor.create(TableProcessor.class.getName()));
+		Vertex v5 = Vertex.create(HASHJOINPROCESSOR,
+				ProcessorDescriptor.create(HashJoinProcessor.class.getName()).setUserPayload(joinParameter), 1);
+		Vertex v6 = Vertex.create(SELECTIONPROCESSOR,
+				ProcessorDescriptor.create(SelectionProcessor.class.getName()).setUserPayload(selectionParameter), 1);
+		Vertex v7 = Vertex.create(GROUPBYPROCESSOR,
+				ProcessorDescriptor.create(GroupByProcessor.class.getName()).setUserPayload(groupByParameter), 1);
+		Vertex v8 = Vertex.create(AGGREGATIONPROCESSOR,
+				ProcessorDescriptor.create(AggregationProcessor.class.getName()).setUserPayload(aggregationParameter),
+				1);
+		Vertex v9 = Vertex.create(PROJECTIONPROCESSOR,
+				ProcessorDescriptor.create(ProjectionProcessor.class.getName()).setUserPayload(projectionParameter), 1);
+
+		v1.addDataSource("Scheme", schemeSource1);
+		v2.addDataSource("Data", dataSource1);
+		v3.addDataSource("Scheme", schemeSource2);
+		v4.addDataSource("Data", dataSource2);
+		v9.addDataSink(RESULTOUTPUT, dataSink);
+
+		/*
+		 * v1.addDataSource(ARTIKELSCHEMEINPUT, schemeSource1);
+		 * v2.addDataSource(ARTIKELDATAINPUT, dataSource1);
+		 * v3.addDataSource(LIEGENSCHEMEINPUT, schemeSource2);
+		 * v4.addDataSource(LIEGENDATAINPUT, dataSource2);
+		 * v9.addDataSink(RESULTOUTPUT, dataSink);
+		 */
+
+		// Edges erzeugen:
+		UnorderedKVEdgeConfig eConfig1 = UnorderedKVEdgeConfig.newBuilder(Text.class.getName(), Text.class.getName())
+				.setFromConfiguration(tezConf).build();
+		Edge e1 = Edge.create(v1, v2, eConfig1.createDefaultBroadcastEdgeProperty());
+		Edge e2 = Edge.create(v3, v4, eConfig1.createDefaultBroadcastEdgeProperty());
+		UnorderedKVEdgeConfig eConfig2 = UnorderedKVEdgeConfig
+				.newBuilder(Tuple.class.getName(), NullWritable.class.getName()).setFromConfiguration(tezConf).build();
+		Edge e3 = Edge.create(v2, v5, eConfig2.createDefaultBroadcastEdgeProperty());
+		Edge e4 = Edge.create(v4, v5, eConfig2.createDefaultBroadcastEdgeProperty());
+		Edge e5 = Edge.create(v5, v6, eConfig2.createDefaultBroadcastEdgeProperty());
+		Edge e6 = Edge.create(v6, v7, eConfig2.createDefaultBroadcastEdgeProperty());
+		OrderedPartitionedKVEdgeConfig eConfig3 = OrderedPartitionedKVEdgeConfig
+				.newBuilder(Text.class.getName(), Tuple.class.getName(), HashPartitioner.class.getName())
+				.setFromConfiguration(tezConf).build();
+		Edge e7 = Edge.create(v7, v8, eConfig3.createDefaultEdgeProperty());
+		Edge e8 = Edge.create(v8, v9, eConfig2.createDefaultBroadcastEdgeProperty());
+
+		// UnorderedKVInput
+		// UnorderedKVOutput
+		// ---------------------------
+		// OrderedGroupedKVInput
+		// OrderedPartitionedKVOutput
+		// System.out.println(eConfig2.getInputClassName() + " " +
+		// eConfig2.getOutputClassName());
+		// EdgeProperty testProp =
+		// eConfig2.createDefaultBroadcastEdgeProperty();
+		// System.out.println(testProp.getEdgeSource() + " " +
+		// testProp.getEdgeDestination());
+		// EdgeProperty edgeProp = EdgeProperty.create(DataMovementType.,
+		// dataSourceType, schedulingType, edgeSource, edgeDestination)
+		// EdgeProperty edgeProp =
+		// EdgeProperty.create(DataMovementType.BROADCAST,
+		// DataSourceType.PERSISTED,
+		// SchedulingType.SEQUENTIAL,
+		// OutputDescriptor.create(UnorderedKVOutput.class.getName()),
+		// InputDescriptor.create(UnorderedKVInput.class.getName()));
+		// System.out.println(
+		// edgeProp.getEdgeSource().getClassName() + " " +
+		// edgeProp.getEdgeDestination().getClassName());
+
+		// Graph aufbauen und starten
+		DAG dag = DAG.create("dag");
+		dag.addVertex(v1).addVertex(v2).addVertex(v3).addVertex(v4).addVertex(v5).addVertex(v6).addVertex(v7)
+				.addVertex(v8).addVertex(v9).addEdge(e1).addEdge(e2).addEdge(e3).addEdge(e4).addEdge(e5).addEdge(e6)
+				.addEdge(e7).addEdge(e8);
+
+		return dag;
+	}
+
+}

@@ -59,12 +59,13 @@ public class DAGBuilder {
 		// initialisieren
 		if (dataSourceQueue.size() >= 2) {
 			initializeFirstJoinVertex(tezConf);
+			// Solange noch DataSources vorhanden sind => zusätzliche Joinknoten
+			// initialisieren
+			while (!dataSourceQueue.isEmpty()) {
+				initializeJoinVertex(tezConf);
+			}
 		}
-		// Solange noch DataSources vorhanden sind => zusätzliche Joinknoten
-		// initialisieren
-		if (!dataSourceQueue.isEmpty()) {
-			initializeJoinVertex(tezConf);
-		}
+
 		// Selektion benötigt?
 		if (needSelection) {
 			initializeSelectionVertex(tezConf);
@@ -203,7 +204,7 @@ public class DAGBuilder {
 		// Join-Vertex mit zwei Edges an die jeweiligen Vertices koppeln, welche
 		// gejoined werden sollen
 		UnorderedKVEdgeConfig eConfig = UnorderedKVEdgeConfig
-				.newBuilder(Tuple.class.getName(), NullWritable.class.getName()).setFromConfiguration(tezConf).build();
+				.newBuilder(NullWritable.class.getName(), Tuple.class.getName()).setFromConfiguration(tezConf).build();
 		// Edge e1 = Edge.create(leftJoinVertex, hashJoinVertex,
 		// eConfig.createDefaultBroadcastEdgeProperty());
 		// Edge e2 = Edge.create(rightJoinVertex, hashJoinVertex,
@@ -251,7 +252,7 @@ public class DAGBuilder {
 		// Join-Vertex mit zwei Edges an die jeweiligen Vertices koppeln, welche
 		// gejoined werden sollen
 		UnorderedKVEdgeConfig eConfig = UnorderedKVEdgeConfig
-				.newBuilder(Tuple.class.getName(), NullWritable.class.getName()).setFromConfiguration(tezConf).build();
+				.newBuilder(NullWritable.class.getName(), Tuple.class.getName()).setFromConfiguration(tezConf).build();
 		Edge e1 = Edge.create(existingHashJoinVertex, newHashJoinVertex, eConfig.createDefaultOneToOneEdgeProperty());
 		Edge e2 = Edge.create(vertexToJoin, newHashJoinVertex, eConfig.createDefaultOneToOneEdgeProperty());
 
@@ -271,7 +272,7 @@ public class DAGBuilder {
 		// Vorletzten Vertex der Liste holen und mit Selektionsknoten über Edge
 		// verknüpfen
 		UnorderedKVEdgeConfig eConfig = UnorderedKVEdgeConfig
-				.newBuilder(Tuple.class.getName(), NullWritable.class.getName()).setFromConfiguration(tezConf).build();
+				.newBuilder(NullWritable.class.getName(), Tuple.class.getName()).setFromConfiguration(tezConf).build();
 		// Vertex vertexToConnect = vertexList.get(vertexList.size() - 2);
 		// Edge e = Edge.create(vertexToConnect, v,
 		// eConfig.createDefaultBroadcastEdgeProperty());
@@ -287,13 +288,13 @@ public class DAGBuilder {
 		vertexQueue.add(groupByVertex);
 
 		UnorderedKVEdgeConfig eConfig1 = UnorderedKVEdgeConfig
-				.newBuilder(Tuple.class.getName(), NullWritable.class.getName()).setFromConfiguration(tezConf).build();
+				.newBuilder(NullWritable.class.getName(), Tuple.class.getName()).setFromConfiguration(tezConf).build();
 		Edge e1 = Edge.create(vertexToConnect, groupByVertex, eConfig1.createDefaultOneToOneEdgeProperty());
 		edgeQueue.add(e1);
 
 		// Aggregationsvertex erzeugen und mit GroupBy-Knoten verbinden
 		Configuration conf = new Configuration();
-		conf.set("AggregateFunctions", "count(liegen.lnr), sum(liegen.bestand)");
+		conf.set("AggregateFunctions", "count(artikel.preis)");
 		UserPayload up = TezUtils.createUserPayloadFromConf(conf);
 
 		Vertex aggregateVertex = Vertex.create("v" + ++vertexCount,
@@ -317,7 +318,7 @@ public class DAGBuilder {
 		// Vorletzten Vertex der Liste holen und mit Projektionsknoten über Edge
 		// verknüpfen
 		UnorderedKVEdgeConfig eConfig = UnorderedKVEdgeConfig
-				.newBuilder(Tuple.class.getName(), NullWritable.class.getName()).setFromConfiguration(tezConf).build();
+				.newBuilder(NullWritable.class.getName(), Tuple.class.getName()).setFromConfiguration(tezConf).build();
 		Edge e = Edge.create(vertexToConnect, v, eConfig.createDefaultOneToOneEdgeProperty());
 		edgeQueue.add(e);
 	}
@@ -333,7 +334,7 @@ public class DAGBuilder {
 		// Vorletzten Vertex der Liste holen und mit Projektionsknoten über Edge
 		// verknüpfen
 		UnorderedKVEdgeConfig eConfig = UnorderedKVEdgeConfig
-				.newBuilder(Tuple.class.getName(), NullWritable.class.getName()).setFromConfiguration(tezConf).build();
+				.newBuilder(NullWritable.class.getName(), Tuple.class.getName()).setFromConfiguration(tezConf).build();
 		Edge e = Edge.create(vertexToConnect, v, eConfig.createDefaultOneToOneEdgeProperty());
 		edgeQueue.add(e);
 	}

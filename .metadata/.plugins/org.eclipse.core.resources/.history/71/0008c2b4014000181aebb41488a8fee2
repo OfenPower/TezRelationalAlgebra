@@ -1,0 +1,39 @@
+package de.bachd.bigdata.tez;
+
+import org.apache.tez.runtime.api.ProcessorContext;
+import org.apache.tez.runtime.library.api.KeyValueWriter;
+import org.apache.tez.runtime.library.api.KeyValuesReader;
+import org.apache.tez.runtime.library.processor.SimpleProcessor;
+
+public class MergeJoinProcessor extends SimpleProcessor {
+
+	private String leftJoinVertexName;
+	private String rightJoinVertexName;
+	private String leftJoinAttribute;
+	private String rightJoinAttribute;
+
+	public MergeJoinProcessor(ProcessorContext context) {
+		super(context);
+	}
+
+	@Override
+	public void run() throws Exception {
+		// KeyValueReader und Writer initialisieren
+		KeyValuesReader kvsReader1 = (KeyValuesReader) getInputs().get(leftJoinVertexName).getReader();
+		KeyValuesReader kvsReader2 = (KeyValuesReader) getInputs().get(rightJoinVertexName).getReader();
+		KeyValueWriter kvWriter = (KeyValueWriter) getOutputs().values().iterator().next().getWriter();
+
+		while (kvsReader1.next()) {
+			while(kvsReader2.next()) {
+				
+			}
+		}
+
+	}
+
+	@Override
+	public void initialize() {
+		System.out.println("Initialize MergeJoinProcessor");
+	}
+
+}

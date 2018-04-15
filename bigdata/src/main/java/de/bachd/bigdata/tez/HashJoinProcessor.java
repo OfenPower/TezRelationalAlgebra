@@ -48,7 +48,7 @@ public class HashJoinProcessor extends SimpleProcessor {
 
 		// Alle Tupel der linken Join-Relation in die Hashmap laden
 		while (kvReader1.next()) {
-			Tuple tuple = (Tuple) kvReader1.getCurrentKey();
+			Tuple tuple = (Tuple) kvReader1.getCurrentValue();
 			String value = tuple.getNamesValuesMap().get(this.leftJoinAttribute);
 			System.out.println("----------" + value + "    " + leftJoinAttribute);
 			// Tupleobjekt kopieren und in Multimap laden
@@ -65,7 +65,7 @@ public class HashJoinProcessor extends SimpleProcessor {
 		// nun mit den Tupeln des ersten Readers gejoint, falls das jeweilige
 		// Joinattribut in der HashMap vorkommt.
 		while (kvReader2.next()) {
-			Tuple rightTuple = (Tuple) kvReader2.getCurrentKey();
+			Tuple rightTuple = (Tuple) kvReader2.getCurrentValue();
 			// Multimap besteht aus Listen von leftSide-Tupeln =>
 			// rightSideJoinAttribute zum Zugriff auf Attribute benutzen
 			String joinAttribute = rightTuple.getNamesValuesMap().get(this.rightJoinAttribute);
@@ -87,8 +87,7 @@ public class HashJoinProcessor extends SimpleProcessor {
 					// ---------------------------------------------------------
 					// DEBUG
 					joinedTuple.printColumnValues();
-					NullWritable nullValue = NullWritable.get();
-					kvWriter.write(joinedTuple, nullValue);
+					kvWriter.write(NullWritable.get(), joinedTuple);
 				}
 			}
 		}
@@ -111,9 +110,6 @@ public class HashJoinProcessor extends SimpleProcessor {
 		while (attrIterator2.hasNext()) {
 			this.leftJoinAttribute = attrIterator2.next();
 			this.rightJoinAttribute = attrIterator2.next();
-			// DEBUG: Joinattribute anzeigen!
-			// System.out.println(this.leftSideJoinAttribute);
-			// System.out.println(this.rightSideJoinAttribute);
 		}
 		// DEBUG
 		System.out.println("Join on: " + joinAttributes);

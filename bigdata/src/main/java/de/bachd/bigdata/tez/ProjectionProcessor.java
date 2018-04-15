@@ -40,7 +40,7 @@ public class ProjectionProcessor extends SimpleMRProcessor {
 		List<String> projectedAttributeDomains = new ArrayList<>();
 		boolean schemeRead = false; // für einmalige Schemaspeicherung
 		while (kvReader.next()) {
-			Tuple tuple = (Tuple) kvReader.getCurrentKey();
+			Tuple tuple = (Tuple) kvReader.getCurrentValue();
 			List<String> projectedAttributeValues = new ArrayList<>();
 			Map<String, String> namesValuesMap = tuple.getNamesValuesMap();
 			Map<String, String> namesDomainsMap = tuple.getNamesDomainsMap();
@@ -59,7 +59,7 @@ public class ProjectionProcessor extends SimpleMRProcessor {
 			schemeRead = true;
 			Tuple projectedTuple = new Tuple();
 			projectedTuple.set(projectedAttributeNames, projectedAttributeDomains, projectedAttributeValues);
-			kvWriter.write(projectedTuple, NullWritable.get());
+			kvWriter.write(NullWritable.get(), projectedTuple);
 		}
 	}
 

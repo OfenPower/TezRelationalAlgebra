@@ -166,9 +166,4 @@ public class Tuple implements Writable {
 		// ----------------------
 	}
 
-	@Override
-	public int hashCode() {
-		return this.attributeValues.hashCode();
-	}
-
 }
