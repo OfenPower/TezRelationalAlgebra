@@ -21,7 +21,7 @@ public class EdgeConfigs {
 				.build();
 
 		System.out.println(eConf1.getOutputClassName() + "    " + eConf1.getInputClassName());
+		System.out.println(eConf2.getOutputClassName() + "    " + eConf2.getInputClassName());
 		System.out.println(eConf3.getOutputClassName() + "    " + eConf3.getInputClassName());
-
 	}
 }
