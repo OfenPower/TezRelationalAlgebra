@@ -8,29 +8,21 @@ import org.apache.tez.runtime.library.api.KeyValueReader;
 import org.apache.tez.runtime.library.api.KeyValueWriter;
 import org.apache.tez.runtime.library.processor.SimpleProcessor;
 
-import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
 
 public class SchemeProcessor extends SimpleProcessor {
 
 	public SchemeProcessor(ProcessorContext context) {
 		super(context);
-
 	}
 
 	@Override
 	public void run() throws Exception {
-		Preconditions.checkState(getInputs().size() == 1);
-		Preconditions.checkState(getOutputs().size() == 1);
-
-		// KeyValueReader kvReader = (KeyValueReader)
-		// getInputs().values().iterator().next().getReader();
 		KeyValueReader kvReader = (KeyValueReader) getInputs().get("SchemeInput").getReader();
 		KeyValueWriter kvWriter = (KeyValueWriter) getOutputs().values().iterator().next().getWriter();
-		// Schema nach RelationName und Attribute aufsplitten
+		// Schema nach Name der Relation und Attribute aufsplitten
 		if (kvReader.next()) {
 			String schemeString = kvReader.getCurrentValue().toString();
-			System.out.println(schemeString);
 			Iterable<String> schemeItr = Splitter.on(';').trimResults().omitEmptyStrings().split(schemeString);
 			Iterator<String> schemeIterator = schemeItr.iterator();
 			while (schemeIterator.hasNext()) {

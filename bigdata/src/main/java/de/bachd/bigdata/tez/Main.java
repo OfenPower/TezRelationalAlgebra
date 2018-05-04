@@ -41,24 +41,21 @@ public class Main extends Configured implements Tool {
 		// NullWritable.class.getName());
 
 		// Query aus angegebener Datei in einen String auslesen
-		// String query = readQueryFromFile(args[0]);
+		String query = readQueryFromFile(args[0]);
 
 		// DAG aus String erzeugen
 		DAGBuilder dagBuilder = new DAGBuilder();
-		// DAG dag = dagBuilder.buildDAGFromString(query, tezConf);
-		DAG dag2 = DAGTestBuilder.buildJoinDAG(tezConf);
+		DAG dag = dagBuilder.buildDAGFromString(query, tezConf);
 
 		// TezClient starten
 		TezClient tezClient = TezClient.create("TezClient", tezConf);
 		tezClient.start();
 
-		return runDAGJob(dag2, tezConf, tezClient);
+		return runDAGJob(dag, tezConf, tezClient);
 	}
 
 	private int runDAGJob(DAG dag, TezConfiguration tezConf, TezClient tezClient) throws TezException, IOException {
-		System.out.println();
-		System.out.println();
-		System.out.println("Start DAG");
+		System.out.println("\n\nStart DAG!");
 		try {
 			DAGClient dagClient = tezClient.submitDAG(dag);
 			DAGStatus dagStatus;

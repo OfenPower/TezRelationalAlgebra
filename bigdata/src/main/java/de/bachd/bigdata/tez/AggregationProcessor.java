@@ -1,5 +1,6 @@
 package de.bachd.bigdata.tez;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -27,9 +28,42 @@ public class AggregationProcessor extends SimpleProcessor {
 
 	private List<Pair<AggregationStrategy, String>> aggregateFunctions;
 
-	public AggregationProcessor(ProcessorContext context) {
+	public AggregationProcessor(ProcessorContext context) throws IOException {
 		super(context);
 		aggregateFunctions = new ArrayList<>();
+		UserPayload up = getContext().getUserPayload();
+		Configuration conf = TezUtils.createConfFromUserPayload(up);
+		String aggregateFunctions = conf.get("AggregateFunctions");
+		System.out.println("Aggregate-Functions: " + aggregateFunctions);
+		// Aggregatfunktionen splitten und jeweilige AggregateStrategy-Objekte
+		// mit jeweiligen zu aggregierenden Attributen erzeugen
+		Iterable<String> aggregateFunctionsItr = Splitter.on(',').trimResults().omitEmptyStrings()
+				.split(aggregateFunctions);
+		for (String func : aggregateFunctionsItr) {
+			Iterable<String> funcItr = Splitter.on(CharMatcher.anyOf("(").or(CharMatcher.anyOf(")"))).trimResults()
+					.omitEmptyStrings().split(func);
+			Iterator<String> funcIterator = funcItr.iterator();
+			while (funcIterator.hasNext()) {
+				String funcName = funcIterator.next();
+				String attributeName = funcIterator.next();
+				Pair<AggregationStrategy, String> pair = null;
+				switch (funcName) {
+				case "sum": {
+					pair = new Pair<>(new SumStrategy(), attributeName);
+					break;
+				}
+				case "count": {
+					pair = new Pair<>(new CountStrategy(), attributeName);
+					break;
+				}
+				case "avg": {
+					pair = new Pair<>(new AverageStrategy(), attributeName);
+					break;
+				}
+				}
+				this.aggregateFunctions.add(pair);
+			}
+		}
 	}
 
 	@Override
@@ -73,11 +107,6 @@ public class AggregationProcessor extends SimpleProcessor {
 			for (Pair<AggregationStrategy, String> pair : aggregateFunctions) {
 				AggregationStrategy aggregate = pair.getLeft();
 				Object aggregatedValue = aggregate.getValue();
-				// DEBUG: Aggregierter Wert anzeigen!
-				// System.out.println(key + ": " +
-				// aggregate.getAggregateFunctionName() + ": " +
-				// aggregatedValue);
-
 				// Aggregatfunktionen als zusätzliche Spalte einfügen:
 				// AttributeName = "aggFunc(attribute)"
 				// AttributeDomain = Rückgabetyp der Aggregatfunktion
@@ -85,59 +114,22 @@ public class AggregationProcessor extends SimpleProcessor {
 				attributeNames.add(aggregate.getAggregateFunctionName() + "(" + pair.getRight() + ")");
 				attributeDomains.add(aggregate.getResultDomain());
 				attributeValues.add("" + aggregatedValue);
-
-				// Aggregat gegen neues Aggregat austauschen
+				// altes Aggregat gegen neues Aggregat austauschen
 				pair.setLeft(aggregate.cloneStrategy());
 			}
 
 			// Ergebnistuple erzeugen.
 			Tuple aggregatedTuple = new Tuple();
 			aggregatedTuple.set(attributeNames, attributeDomains, attributeValues);
-			// DEBUG
-			aggregatedTuple.printColumnValues();
+			// DEBUG: aggregiertes Tupel anzeigen
+			// aggregatedTuple.printColumnValues();
 			kvWriter.write(NullWritable.get(), aggregatedTuple);
-			System.out.println("---------------");
-
 		}
 	}
 
 	@Override
 	public void initialize() throws Exception {
 		System.out.println("Initialize AggregationProcessor");
-		UserPayload up = getContext().getUserPayload();
-		Configuration conf = TezUtils.createConfFromUserPayload(up);
-		String aggregateFunctions = conf.get("AggregateFunctions");
-		System.out.println("Aggregate-Functions: " + aggregateFunctions);
-		// Aggregatfunktionen splitten und jeweilige AggregateStrategy-Objekte
-		// mit jeweiligen zu aggregierenden Attributen erzeugen
-		Iterable<String> aggregateFunctionsItr = Splitter.on(',').trimResults().omitEmptyStrings()
-				.split(aggregateFunctions);
-		for (String func : aggregateFunctionsItr) {
-			System.out.println(func);
-			Iterable<String> funcItr = Splitter.on(CharMatcher.anyOf("(").or(CharMatcher.anyOf(")"))).trimResults()
-					.omitEmptyStrings().split(func);
-			Iterator<String> funcIterator = funcItr.iterator();
-			while (funcIterator.hasNext()) {
-				String funcName = funcIterator.next();
-				String attributeName = funcIterator.next();
-				Pair<AggregationStrategy, String> pair = null;
-				switch (funcName) {
-				case "sum": {
-					pair = new Pair<>(new SumStrategy(), attributeName);
-					break;
-				}
-				case "count": {
-					pair = new Pair<>(new CountStrategy(), attributeName);
-					break;
-				}
-				case "avg": {
-					pair = new Pair<>(new AverageStrategy(), attributeName);
-					break;
-				}
-				}
-				this.aggregateFunctions.add(pair);
-			}
-		}
 	}
 
 }

@@ -1,5 +1,6 @@
 package de.bachd.bigdata.tez;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -18,9 +19,18 @@ public class GroupByProcessor extends SimpleProcessor {
 
 	private List<String> groupByAttributeList;
 
-	public GroupByProcessor(ProcessorContext context) {
+	public GroupByProcessor(ProcessorContext context) throws IOException {
 		super(context);
 		groupByAttributeList = new ArrayList<>();
+		UserPayload up = getContext().getUserPayload();
+		String groupByAttributes = TezUtils.createConfFromUserPayload(up).get("GroupByAttributes");
+		Iterable<String> groupByAttributesItr = Splitter.on(',').trimResults().omitEmptyStrings()
+				.split(groupByAttributes);
+		for (String attribute : groupByAttributesItr) {
+			groupByAttributeList.add(attribute);
+		}
+		// DEBUG: Gruppierungsattribute anzeigen
+		// System.out.println("Grouped by " + groupByAttributes);
 	}
 
 	@Override
@@ -37,10 +47,7 @@ public class GroupByProcessor extends SimpleProcessor {
 			StringBuilder sb = new StringBuilder();
 			for (String attribute : groupByAttributeList) {
 				sb.append(tupleColumnStringMap.get(attribute) + ";");
-				// sb.append(", ");
 			}
-			// Letzten ", "-String aus StringBuilder löschen
-			// sb.delete(sb.length() - 2, sb.length());
 			Text key = new Text(sb.toString());
 			System.out.println("GroupBy key: " + key.toString());
 			kvWriter.write(key, tuple);
@@ -50,16 +57,6 @@ public class GroupByProcessor extends SimpleProcessor {
 	@Override
 	public void initialize() throws Exception {
 		System.out.println("Initialize GroupByProcessor");
-		UserPayload up = getContext().getUserPayload();
-		String groupByAttributes = TezUtils.createConfFromUserPayload(up).get("GroupByAttributes");
-		Iterable<String> groupByAttributesItr = Splitter.on(',').trimResults().omitEmptyStrings()
-				.split(groupByAttributes);
-		for (String attribute : groupByAttributesItr) {
-			groupByAttributeList.add(attribute);
-		}
-		// DEBUG
-		System.out.println("Grouped by " + groupByAttributes);
-
 	}
 
 }

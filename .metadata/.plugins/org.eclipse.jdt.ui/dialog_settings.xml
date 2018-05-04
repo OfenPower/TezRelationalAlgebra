@@ -1,9 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <section name="Workbench">
-	<section name="RefactoringWizard.preview">
-		<item value="600" key="width"/>
-		<item value="400" key="height"/>
-	</section>
 	<section name="org.eclipse.ltk.ui.refactoring.settings">
 		<item value="false" key="renameSubpackages"/>
 		<item value="false" key="updateQualifiedNames"/>
@@ -21,13 +17,31 @@
 		<item value="false" key="create_constructor"/>
 		<item value="true" key="create_unimplemented"/>
 	</section>
+	<section name="OptionalMessageDialog.hide.">
+		<item value="true" key="org.eclipse.jdt.ui.typecomment.deprecated"/>
+	</section>
+	<section name="DialogBounds_GenerateHashCodeEqualsDialog">
+		<item value="505" key="DIALOG_WIDTH"/>
+		<item value="1|Noto Sans|9.0|0|GTK|1|" key="DIALOG_FONT_NAME"/>
+		<item value="624" key="DIALOG_HEIGHT"/>
+		<item value="711" key="DIALOG_X_ORIGIN"/>
+		<item value="32" key="DIALOG_Y_ORIGIN"/>
+	</section>
+	<section name="RefactoringWizard.preview">
+		<item value="600" key="width"/>
+		<item value="400" key="height"/>
+	</section>
+	<section name="SourceActionDialog.methods">
+		<item value="false" key="Blocks"/>
+		<item value="false" key="SynchronizedModifier"/>
+		<item value="false" key="Comments"/>
+		<item value="false" key="InstanceOf"/>
+		<item value="false" key="FinalModifier"/>
+	</section>
 	<section name="RenameInformationPopup">
 	</section>
 	<section name="ClasspathContainerSelectionPage">
 		<item value="3" key="index"/>
-	</section>
-	<section name="OptionalMessageDialog.hide.">
-		<item value="true" key="org.eclipse.jdt.ui.typecomment.deprecated"/>
 	</section>
 	<section name="quick_assist_proposal_size">
 	</section>

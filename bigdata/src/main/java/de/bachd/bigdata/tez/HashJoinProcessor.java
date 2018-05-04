@@ -31,8 +31,23 @@ public class HashJoinProcessor extends SimpleProcessor {
 	private String leftJoinAttribute;
 	private String rightJoinAttribute;
 
-	public HashJoinProcessor(ProcessorContext context) {
+	public HashJoinProcessor(ProcessorContext context) throws IOException {
 		super(context);
+		UserPayload up = getContext().getUserPayload();
+		Configuration conf = TezUtils.createConfFromUserPayload(up);
+		leftJoinVertexName = conf.get("LeftJoinVertexName");
+		rightJoinVertexName = conf.get("RightJoinVertexName");
+		String joinAttributes = conf.get("JoinAttribute");
+		// Join-String splitten und in linkes und rechtes Joinattribut der Form
+		// "Relation.Attributname" abspeichern
+		Iterable<String> attrItr2 = Splitter.on('=').trimResults().omitEmptyStrings().split(joinAttributes);
+		Iterator<String> attrIterator2 = attrItr2.iterator();
+		while (attrIterator2.hasNext()) {
+			this.leftJoinAttribute = attrIterator2.next();
+			this.rightJoinAttribute = attrIterator2.next();
+		}
+		// DEBUG: Joinattribute anzeigen
+		// System.out.println("Join on: " + joinAttributes);
 	}
 
 	@Override
@@ -50,15 +65,11 @@ public class HashJoinProcessor extends SimpleProcessor {
 		while (kvReader1.next()) {
 			Tuple tuple = (Tuple) kvReader1.getCurrentValue();
 			String value = tuple.getNamesValuesMap().get(this.leftJoinAttribute);
-			System.out.println("----------" + value + "    " + leftJoinAttribute);
-			// Tupleobjekt kopieren und in Multimap laden
-			// key = joinattribut, value = kopiertes Tuple, welches in Liste
-			// kopiert wird
+			// Tupleobjekt kopieren und in Multimap laden:
+			// key = joinattribut, value = kopiertes Tuple
 			Tuple copiedTuple = Tuple.copyTuple(tuple);
 			joinMultimap.put(value, copiedTuple);
 		}
-
-		System.out.println("---------------------------------------");
 
 		// Die Multimap ist nach der ersten while-Schleife mit Listen von Tupeln
 		// der linken Relation aufgebaut. Alle Tupel des zweiten Readers werden
@@ -85,8 +96,8 @@ public class HashJoinProcessor extends SimpleProcessor {
 					Tuple joinedTuple = new Tuple();
 					joinedTuple.set(joinedNames, joinedDomains, joinedValues);
 					// ---------------------------------------------------------
-					// DEBUG
-					joinedTuple.printColumnValues();
+					// DEBUG: gejointes Tupel anzeigen
+					// oinedTuple.printColumnValues();
 					kvWriter.write(NullWritable.get(), joinedTuple);
 				}
 			}
@@ -96,22 +107,5 @@ public class HashJoinProcessor extends SimpleProcessor {
 	@Override
 	public void initialize() throws IOException {
 		System.out.println("Initialize HashJoinProcessor");
-		UserPayload up = getContext().getUserPayload();
-		Configuration conf = TezUtils.createConfFromUserPayload(up);
-		leftJoinVertexName = conf.get("LeftJoinVertexName");
-		rightJoinVertexName = conf.get("RightJoinVertexName");
-		System.out.println("LEFT JOIN VERTEX NAME: " + leftJoinVertexName);
-		System.out.println("RIGHT JOIN VERTEX NAME: " + rightJoinVertexName);
-		String joinAttributes = conf.get("JoinAttribute");
-		// Join-String splitten und in linkes und rechtes Joinattribut der Form
-		// "Relation.Attributname" abspeichern
-		Iterable<String> attrItr2 = Splitter.on('=').trimResults().omitEmptyStrings().split(joinAttributes);
-		Iterator<String> attrIterator2 = attrItr2.iterator();
-		while (attrIterator2.hasNext()) {
-			this.leftJoinAttribute = attrIterator2.next();
-			this.rightJoinAttribute = attrIterator2.next();
-		}
-		// DEBUG
-		System.out.println("Join on: " + joinAttributes);
 	}
 }

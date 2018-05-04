@@ -1,3 +1,0 @@
-SELECT *
-FROM artikel
-JOIN liegen ON artikel.anr = liegen.anr

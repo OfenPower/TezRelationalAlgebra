@@ -1,0 +1,97 @@
+package de.bachd.bigdata.tez;
+
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.io.Text;
+import org.apache.tez.common.TezUtils;
+import org.apache.tez.dag.api.UserPayload;
+import org.apache.tez.mapreduce.processor.SimpleMRProcessor;
+import org.apache.tez.runtime.api.LogicalInput;
+import org.apache.tez.runtime.api.ProcessorContext;
+import org.apache.tez.runtime.library.api.KeyValueReader;
+import org.apache.tez.runtime.library.api.KeyValueWriter;
+
+import com.google.common.base.Splitter;
+
+public class TableProcessor extends SimpleMRProcessor {
+
+	private String newRelationName;
+	// private String sortAttribute;
+
+	public TableProcessor(ProcessorContext context) {
+		super(context);
+	}
+
+	@Override
+	public void run() throws Exception {
+		// erster Mapeintrag enthält Inputdaten aus .addDataSource()
+		Iterator<LogicalInput> kvReaderItr = getInputs().values().iterator();
+		KeyValueReader kvSchemeReader = null;
+		KeyValueReader kvDataReader = null;
+		while (kvReaderItr.hasNext()) {
+			kvDataReader = (KeyValueReader) kvReaderItr.next().getReader();
+			kvSchemeReader = (KeyValueReader) kvReaderItr.next().getReader();
+		}
+		KeyValueWriter kvTableWriter = (KeyValueWriter) getOutputs().values().iterator().next().getWriter();
+		// Schema lesen, Daten lesen, splitten und als Tuple
+		// speichern. Output: (Tuple, Schema)
+		if (kvSchemeReader.next()) {
+			Text relationName = (Text) kvSchemeReader.getCurrentKey();
+			Text scheme = (Text) kvSchemeReader.getCurrentValue();
+			Iterable<String> schemeValues = Splitter.on(' ').trimResults().omitEmptyStrings().split(scheme.toString());
+			List<String> attributeNameList = new ArrayList<>(); // Liste aller
+																// Attributnamen
+			List<String> attributeDomainList = new ArrayList<>(); // Liste aller
+																	// Attributdomänen
+
+			// Über alle Attribute des Schemas iterieren, Name und Domain
+			// aufbereiten und in Liste speichern
+			for (String col : schemeValues) {
+				Iterable<String> cols = Splitter.on(':').trimResults().omitEmptyStrings().split(col);
+				Iterator<String> colsItr = cols.iterator();
+				String attributeName = colsItr.next();
+				String attributeDomain = colsItr.next();
+				// Attributname in der Form "Relation.AttributName" speichern,
+				// falls kein neuer Name für Relation im Query angegeben wurde.
+				// Sonst den neuen Namen als Präfix dranhängen
+				if (this.newRelationName == null) {
+					attributeNameList.add(relationName + "." + attributeName);
+				} else {
+					attributeNameList.add(this.newRelationName + "." + attributeName);
+				}
+				attributeDomainList.add(attributeDomain);
+			}
+
+			// Daten aus .csv Datei lesen, aufbereiten und in Liste abspeichern
+			while (kvDataReader.next()) {
+				String row = kvDataReader.getCurrentValue().toString();
+				Iterable<String> values = Splitter.on('\t').trimResults().omitEmptyStrings().split(row);
+				// Liste aller Attributvalues
+				List<String> attributeValueList = new ArrayList<>();
+				for (String value : values) {
+					attributeValueList.add(value);
+				}
+				// Tuple erzeugen und dort Daten + Columns speichern und
+				// rausschreiben
+				Tuple tuple = new Tuple();
+				tuple.set(attributeNameList, attributeDomainList, attributeValueList);
+				// Text key = new
+				// Text(tuple.getNamesValuesMap().get(this.sortAttribute));
+				kvTableWriter.write(key, tuple);
+			}
+		}
+	}
+
+	@Override
+	public void initialize() throws Exception {
+		System.out.println("Initialize TableProcessor");
+		UserPayload up = getContext().getUserPayload();
+		Configuration conf = TezUtils.createConfFromUserPayload(up);
+		this.sortAttribute = conf.get("SortAttribute");
+		System.out.println("Sort by: " + sortAttribute);
+
+	}
+}

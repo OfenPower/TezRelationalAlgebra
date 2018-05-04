@@ -4,10 +4,8 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.Text;
-import org.apache.tez.common.TezUtils;
-import org.apache.tez.dag.api.UserPayload;
 import org.apache.tez.mapreduce.processor.SimpleMRProcessor;
 import org.apache.tez.runtime.api.LogicalInput;
 import org.apache.tez.runtime.api.ProcessorContext;
@@ -19,10 +17,14 @@ import com.google.common.base.Splitter;
 public class TableProcessor extends SimpleMRProcessor {
 
 	private String newRelationName;
-	private String sortAttribute;
+	// private String sortAttribute;
 
 	public TableProcessor(ProcessorContext context) {
 		super(context);
+		// UserPayload up = getContext().getUserPayload();
+		// Configuration conf = TezUtils.createConfFromUserPayload(up);
+		// this.sortAttribute = conf.get("SortAttribute");
+		// System.out.println("Sort by: " + sortAttribute);
 	}
 
 	@Override
@@ -78,8 +80,9 @@ public class TableProcessor extends SimpleMRProcessor {
 				// rausschreiben
 				Tuple tuple = new Tuple();
 				tuple.set(attributeNameList, attributeDomainList, attributeValueList);
-				Text key = new Text(tuple.getNamesValuesMap().get(this.sortAttribute));
-				kvTableWriter.write(key, tuple);
+				// Text key = new
+				// Text(tuple.getNamesValuesMap().get(this.sortAttribute));
+				kvTableWriter.write(NullWritable.get(), tuple);
 			}
 		}
 	}
@@ -87,10 +90,5 @@ public class TableProcessor extends SimpleMRProcessor {
 	@Override
 	public void initialize() throws Exception {
 		System.out.println("Initialize TableProcessor");
-		UserPayload up = getContext().getUserPayload();
-		Configuration conf = TezUtils.createConfFromUserPayload(up);
-		this.sortAttribute = conf.get("SortAttribute");
-		System.out.println("Sort by: " + sortAttribute);
-
 	}
 }

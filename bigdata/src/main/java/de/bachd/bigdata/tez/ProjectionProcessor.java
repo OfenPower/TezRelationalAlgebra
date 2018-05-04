@@ -27,13 +27,25 @@ public class ProjectionProcessor extends SimpleMRProcessor {
 
 	private List<String> projectionList = new ArrayList<>();
 
-	public ProjectionProcessor(ProcessorContext context) {
+	public ProjectionProcessor(ProcessorContext context) throws IOException {
 		super(context);
+		// Projektionsattribute über UserPayload holen
+		UserPayload up = getContext().getUserPayload();
+		Configuration conf = TezUtils.createConfFromUserPayload(up);
+		String projection = conf.get("Projection");
+		// Projektionsattribute splitten und einzeln der Projektionsliste
+		// hinzufügen.
+		Iterable<String> projItr = Splitter.on(',').trimResults().omitEmptyStrings().split(projection);
+		for (String s : projItr) {
+			projectionList.add(s);
+		}
+
+		// DEBUG Projektionsattribute anzeigen
+		// System.out.println("Projektion auf: " + projection);
 	}
 
 	@Override
 	public void run() throws Exception {
-		// SELECT a, b FROM
 		KeyValueReader kvReader = (KeyValueReader) getInputs().values().iterator().next().getReader();
 		KeyValueWriter kvWriter = (KeyValueWriter) getOutputs().values().iterator().next().getWriter();
 		List<String> projectedAttributeNames = new ArrayList<>();
@@ -66,19 +78,5 @@ public class ProjectionProcessor extends SimpleMRProcessor {
 	@Override
 	public void initialize() throws IOException {
 		System.out.println("Initialize ProjectionProcessor");
-		// UserPayload in Configuration konvertieren und Projektionsattribute
-		// holen
-		UserPayload up = getContext().getUserPayload();
-		Configuration conf = TezUtils.createConfFromUserPayload(up);
-		String projection = conf.get("Projection");
-		// Projektionsattribute splitten und einzeln der Projektionsliste
-		// hinzufügen.
-		Iterable<String> projItr = Splitter.on(',').trimResults().omitEmptyStrings().split(projection);
-		for (String s : projItr) {
-			projectionList.add(s);
-		}
-
-		// DEBUG Projektionsattribute anzeigen
-		System.out.println("Projektion auf: " + projection);
 	}
 }

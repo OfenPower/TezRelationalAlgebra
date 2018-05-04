@@ -43,8 +43,6 @@ public class DAGBuilder {
 	private UserPayload tableParameter;
 
 	private ArrayDeque<String> dataSourceQueue = new ArrayDeque<>();
-	private DataSinkDescriptor outputTable;
-	private DataSinkDescriptor outputScheme;
 
 	private int vertexCount = 0;
 	private ArrayDeque<Vertex> vertexQueue = new ArrayDeque<>();
@@ -54,13 +52,13 @@ public class DAGBuilder {
 
 	public DAG buildDAGFromString(String query, TezConfiguration tezConf) throws Exception {
 		initializeUserPayloads(query);
-		initializeDataSourcesAndDataSinks(tezConf);
+		initializeSchemeAndTableProcessorVertices(tezConf);
 		// Wenn mehr als eine DataSource vorhanden: Ersten Joinknoten
 		// initialisieren
 		if (dataSourceQueue.size() >= 2) {
 			initializeFirstJoinVertex(tezConf);
 			// Solange noch DataSources vorhanden sind => zusätzliche Joinknoten
-			// initialisieren
+			// initialisieren und anfügen
 			while (!dataSourceQueue.isEmpty()) {
 				initializeJoinVertex(tezConf);
 			}
@@ -70,6 +68,7 @@ public class DAGBuilder {
 		if (needSelection) {
 			initializeSelectionVertex(tezConf);
 		}
+		// Gruppierung benötigt?
 		if (needGroup) {
 			initializeGroupByAndAggregationVertex(tezConf);
 		}
@@ -92,7 +91,6 @@ public class DAGBuilder {
 	}
 
 	private void initializeUserPayloads(String query) throws TezException, IOException {
-
 		List<String> queryParts = Lists.newArrayList(Splitter.on("\n").trimResults().omitEmptyStrings().split(query));
 		for (String s : queryParts) {
 			// Projektionspayload initialisieren
@@ -118,7 +116,7 @@ public class DAGBuilder {
 		}
 	}
 
-	private void initializeDataSourcesAndDataSinks(TezConfiguration tezConf) {
+	private void initializeSchemeAndTableProcessorVertices(TezConfiguration tezConf) {
 		// Für jede gespeicherte Relation in dataSourceList je zwei
 		// DataSourceDescriptor erzeugen (1x für .csv und 1x für .scheme)
 		for (String dataSource : dataSourceQueue) {
@@ -156,14 +154,6 @@ public class DAGBuilder {
 			// verarbeitet von Vertex: " + v2.getName());
 		}
 
-		// Zwei DataSinks erzeugen (1x für Ergebnisdaten und 1x für das
-		// Ergebnisschema)
-		outputTable = MROutput
-				.createConfigBuilder(new Configuration(tezConf), TextOutputFormat.class, "./tables/output_table")
-				.build();
-		outputScheme = MROutput
-				.createConfigBuilder(new Configuration(tezConf), TextOutputFormat.class, "./tables/output_scheme")
-				.build();
 	}
 
 	private void initializeFirstJoinVertex(TezConfiguration tezConf) throws Exception {
@@ -186,11 +176,9 @@ public class DAGBuilder {
 		// UserPayload mit Joinparametern initialisieren
 		Configuration conf = new Configuration();
 		if (joinAttribute.startsWith(leftRelationToJoin)) {
-			System.out.println(true);
 			conf.set("LeftJoinVertexName", leftRelationVertexName);
 			conf.set("RightJoinVertexName", rightRelationVertexName);
 		} else {
-			System.out.println(false);
 			conf.set("LeftJoinVertexName", rightRelationVertexName);
 			conf.set("RightJoinVertexName", leftRelationVertexName);
 		}
@@ -234,11 +222,9 @@ public class DAGBuilder {
 		// UserPayload mit Joinparametern initialisieren
 		Configuration conf = new Configuration();
 		if (joinAttribute.startsWith(relationToJoin)) {
-			System.out.println(true);
 			conf.set("LeftJoinVertexName", relationVertexName);
 			conf.set("RightJoinVertexName", hashJoinVertexName);
 		} else {
-			System.out.println(false);
 			conf.set("LeftJoinVertexName", hashJoinVertexName);
 			conf.set("RightJoinVertexName", relationVertexName);
 		}
@@ -324,6 +310,16 @@ public class DAGBuilder {
 	}
 
 	private void initializeOutputVertex(TezConfiguration tezConf) {
+
+		// Zwei DataSinks erzeugen (1x für Ergebnisdaten und 1x für das
+		// Ergebnisschema)
+		DataSinkDescriptor outputTable = MROutput
+				.createConfigBuilder(new Configuration(tezConf), TextOutputFormat.class, "./tables/output_table")
+				.build();
+		DataSinkDescriptor outputScheme = MROutput
+				.createConfigBuilder(new Configuration(tezConf), TextOutputFormat.class, "./tables/output_scheme")
+				.build();
+
 		// Projektionsknoten erzeugen, speichern und mit DataSinks verknüpfen
 		Vertex v = Vertex.create("v" + ++vertexCount, ProcessorDescriptor.create(OutputProcessor.class.getName()));
 		v.addDataSink("OutputTable", outputTable);
