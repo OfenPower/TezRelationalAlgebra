@@ -1,0 +1,14 @@
+package de.bachd.bigdata.tez;
+
+public class Main {
+
+	public static void main(String[] args) throws Exception {
+		if (args.length != 1) {
+			System.out.println("Too many arguments! Enter only one .sql file (e.g. query01.sql)");
+		} else {
+			// Tez in der Klasse TezRunner starten!
+			// ToolRunner.run(new Configuration(), new TezRunner(), args);
+		}
+	}
+
+}

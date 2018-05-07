@@ -1,6 +1,26 @@
-/home/ofen/eclipse workspace/bigdata/src/main/java/de/bachd/bigdata/Query.java
-/home/ofen/eclipse workspace/bigdata/src/main/java/de/bachd/bigdata/QueryNode.java
-/home/ofen/eclipse workspace/bigdata/src/main/java/de/bachd/bigdata/QueryBuilder.java
-/home/ofen/eclipse workspace/bigdata/src/main/java/de/bachd/bigdata/TezExampleBase.java
-/home/ofen/eclipse workspace/bigdata/src/main/java/de/bachd/bigdata/App.java
-/home/ofen/eclipse workspace/bigdata/src/main/java/de/bachd/bigdata/WordCount.java
+/home/ofen/eclipse workspace backup/TezRelationalAlgebra/bigdata/src/main/java/de/bachd/bigdata/tez/MergeJoinProcessor.java
+/home/ofen/eclipse workspace backup/TezRelationalAlgebra/bigdata/src/main/java/de/bachd/bigdata/tez/OutputProcessor.java
+/home/ofen/eclipse workspace backup/TezRelationalAlgebra/bigdata/src/main/java/de/bachd/bigdata/tez/wordcount/TezExampleBase.java
+/home/ofen/eclipse workspace backup/TezRelationalAlgebra/bigdata/src/main/java/de/bachd/bigdata/predicate/IntegerComparable.java
+/home/ofen/eclipse workspace backup/TezRelationalAlgebra/bigdata/src/main/java/de/bachd/bigdata/tez/Main.java
+/home/ofen/eclipse workspace backup/TezRelationalAlgebra/bigdata/src/main/java/de/bachd/bigdata/tez/SelectionProcessor.java
+/home/ofen/eclipse workspace backup/TezRelationalAlgebra/bigdata/src/main/java/de/bachd/bigdata/tez/TezRunner.java
+/home/ofen/eclipse workspace backup/TezRelationalAlgebra/bigdata/src/main/java/de/bachd/bigdata/predicate/DoubleComparable.java
+/home/ofen/eclipse workspace backup/TezRelationalAlgebra/bigdata/src/main/java/de/bachd/bigdata/aggregation/AggregationStrategy.java
+/home/ofen/eclipse workspace backup/TezRelationalAlgebra/bigdata/src/main/java/de/bachd/bigdata/tez/CustomPartitioner.java
+/home/ofen/eclipse workspace backup/TezRelationalAlgebra/bigdata/src/main/java/de/bachd/bigdata/aggregation/CountStrategy.java
+/home/ofen/eclipse workspace backup/TezRelationalAlgebra/bigdata/src/main/java/de/bachd/bigdata/tez/HashJoinProcessor.java
+/home/ofen/eclipse workspace backup/TezRelationalAlgebra/bigdata/src/main/java/de/bachd/bigdata/aggregation/SumStrategy.java
+/home/ofen/eclipse workspace backup/TezRelationalAlgebra/bigdata/src/main/java/de/bachd/bigdata/utils/Pair.java
+/home/ofen/eclipse workspace backup/TezRelationalAlgebra/bigdata/src/main/java/de/bachd/bigdata/tez/TableProcessor.java
+/home/ofen/eclipse workspace backup/TezRelationalAlgebra/bigdata/src/main/java/de/bachd/bigdata/tez/SchemeProcessor.java
+/home/ofen/eclipse workspace backup/TezRelationalAlgebra/bigdata/src/main/java/de/bachd/bigdata/tez/ProjectionProcessor.java
+/home/ofen/eclipse workspace backup/TezRelationalAlgebra/bigdata/src/main/java/de/bachd/bigdata/tez/GroupByProcessor.java
+/home/ofen/eclipse workspace backup/TezRelationalAlgebra/bigdata/src/main/java/de/bachd/bigdata/tez/Tuple.java
+/home/ofen/eclipse workspace backup/TezRelationalAlgebra/bigdata/src/main/java/de/bachd/bigdata/predicate/PredicateComparable.java
+/home/ofen/eclipse workspace backup/TezRelationalAlgebra/bigdata/src/main/java/de/bachd/bigdata/aggregation/AverageStrategy.java
+/home/ofen/eclipse workspace backup/TezRelationalAlgebra/bigdata/src/main/java/de/bachd/bigdata/tez/wordcount/WordCount.java
+/home/ofen/eclipse workspace backup/TezRelationalAlgebra/bigdata/src/main/java/de/bachd/bigdata/tez/DAGBuilder.java
+/home/ofen/eclipse workspace backup/TezRelationalAlgebra/bigdata/src/main/java/de/bachd/bigdata/tez/AggregationProcessor.java
+/home/ofen/eclipse workspace backup/TezRelationalAlgebra/bigdata/src/main/java/de/bachd/bigdata/tez/DAGTestBuilder.java
+/home/ofen/eclipse workspace backup/TezRelationalAlgebra/bigdata/src/main/java/de/bachd/bigdata/predicate/StringComparable.java

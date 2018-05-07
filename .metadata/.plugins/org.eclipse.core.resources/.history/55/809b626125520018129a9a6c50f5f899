@@ -1,0 +1,29 @@
+package de.bachd.bigdata.tez;
+
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.IOException;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.util.ToolRunner;
+import org.apache.tez.client.TezClient;
+import org.apache.tez.dag.api.DAG;
+import org.apache.tez.dag.api.TezConfiguration;
+import org.apache.tez.dag.api.TezException;
+import org.apache.tez.dag.api.client.DAGClient;
+import org.apache.tez.dag.api.client.DAGStatus;
+import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
+
+public class Main {
+
+	public static void main(String[] args) throws Exception {
+		if (args.length != 1) {
+			System.out.println("Too many arguments! Enter only one .sql file (e.g. query01.sql)");
+		} else {
+			ToolRunner.run(new Configuration(), new Main(), args);
+		}
+	}
+
+}

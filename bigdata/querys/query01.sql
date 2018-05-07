@@ -1,5 +1,5 @@
-SELECT artikel.name, lager.name, liegen.bestand
+SELECT artikel.name, sum(liegen.bestand)
 FROM artikel
 JOIN liegen ON artikel.anr = liegen.anr
-JOIN lager ON liegen.lnr = lager.lnr
-WHERE artikel.name = Hose
+WHERE artikel.anr = 1003 or artikel.name = Hose
+GROUP BY artikel.name

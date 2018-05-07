@@ -82,7 +82,7 @@ public class MergeJoinProcessor extends SimpleProcessor {
 					joinedTuple.set(joinedNames, joinedDomains, joinedValues);
 					// ---------------------------------------------------------
 					// DEBUG
-					joinedTuple.printColumnValues();
+					// joinedTuple.printColumnValues();
 					kvWriter.write(NullWritable.get(), joinedTuple);
 				}
 			}

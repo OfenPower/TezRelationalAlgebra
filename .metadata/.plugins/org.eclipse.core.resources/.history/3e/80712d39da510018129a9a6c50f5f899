@@ -1,0 +1,62 @@
+package de.bachd.bigdata.tez;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.hadoop.io.Text;
+import org.apache.tez.common.TezUtils;
+import org.apache.tez.dag.api.UserPayload;
+import org.apache.tez.runtime.api.ProcessorContext;
+import org.apache.tez.runtime.library.api.KeyValueReader;
+import org.apache.tez.runtime.library.api.KeyValueWriter;
+import org.apache.tez.runtime.library.processor.SimpleProcessor;
+
+import com.google.common.base.Splitter;
+
+public class GroupByProcessor extends SimpleProcessor {
+
+	private List<String> groupByAttributeList;
+
+	public GroupByProcessor(ProcessorContext context) throws IOException {
+		super(context);
+		groupByAttributeList = new ArrayList<>();
+		UserPayload up = getContext().getUserPayload();
+		String groupByAttributes = TezUtils.createConfFromUserPayload(up).get("GroupByAttributes");
+		Iterable<String> groupByAttributesItr = Splitter.on(',').trimResults().omitEmptyStrings()
+				.split(groupByAttributes);
+		for (String attribute : groupByAttributesItr) {
+			groupByAttributeList.add(attribute);
+		}
+		// DEBUG: Gruppierungsattribute anzeigen
+		// System.out.println("Grouped by " + groupByAttributes);
+	}
+
+	@Override
+	public void run() throws Exception {
+		KeyValueReader kvReader = (KeyValueReader) getInputs().values().iterator().next().getReader();
+		KeyValueWriter kvWriter = (KeyValueWriter) getOutputs().values().iterator().next().getWriter();
+		while (kvReader.next()) {
+			// AttributeValues der Tuple pro groupByAttribute holen und diese
+			// als groupBy-key verwenden. Anhand dieses keys werden die Tuple an
+			// der ausgehenden OrderedPartitionedEdge partitioniert und
+			// gruppiert!
+			Tuple tuple = (Tuple) kvReader.getCurrentValue();
+			Map<String, String> tupleColumnStringMap = tuple.getNamesValuesMap();
+			StringBuilder sb = new StringBuilder();
+			for (String attribute : groupByAttributeList) {
+				sb.append(tupleColumnStringMap.get(attribute) + ";");
+			}
+			Text key = new Text(sb.toString());
+			// System.out.println("GroupBy key: " + key.toString());
+			kvWriter.write(key, tuple);
+		}
+	}
+
+	@Override
+	public void initialize() throws Exception {
+		System.out.println("Initialize GroupByProcessor");
+	}
+
+}

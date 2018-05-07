@@ -1,0 +1,8 @@
+package de.bachd.bigdata.tez;
+
+import org.apache.hadoop.conf.Configured;
+import org.apache.hadoop.util.Tool;
+
+public class TezRunner extends Configured implements Tool{
+
+}

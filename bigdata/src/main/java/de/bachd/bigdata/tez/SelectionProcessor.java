@@ -67,9 +67,9 @@ public class SelectionProcessor extends SimpleProcessor {
 			}
 		}
 		// DEBUG: BoolOperators ausgeben
-		/*
-		 * for (String s : boolOperators) { System.out.println(s); }
-		 */
+		// for (String s : boolOperators) {
+		// System.out.println(s);
+		// }
 
 		// Über predicateParameter iterieren und einzelne Predicates bauen
 		Deque<Predicate<Tuple>> predQueue = new ArrayDeque<>();
@@ -97,11 +97,6 @@ public class SelectionProcessor extends SimpleProcessor {
 		}
 	}
 
-	/**
-	 * Hier wird vermutlich noch eine Funktion "PredicateComparable.value()"
-	 * benötigt, welche einfach den Wert des PredicateComparables liefert. Damit
-	 * können join-Bedingungungen ausgewertet werden
-	 */
 	// Prädikat abhängig der Operation "relation" zusammenbauen und zurückgeben
 	private Predicate<Tuple> buildPredicate(String attributeName, String relation, String value) {
 		Predicate<Tuple> p = null;

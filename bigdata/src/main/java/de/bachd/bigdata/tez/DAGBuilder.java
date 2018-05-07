@@ -27,7 +27,6 @@ import org.apache.tez.runtime.library.conf.OrderedPartitionedKVEdgeConfig;
 import org.apache.tez.runtime.library.conf.UnorderedKVEdgeConfig;
 import org.apache.tez.runtime.library.partitioner.HashPartitioner;
 
-import com.google.common.base.CharMatcher;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Lists;
 
@@ -40,6 +39,7 @@ public class DAGBuilder {
 	private UserPayload projectionParameter;
 	private UserPayload selectionParameter;
 	private UserPayload groupByParameter;
+	private UserPayload aggregationParameter;
 	private UserPayload tableParameter;
 
 	private ArrayDeque<String> dataSourceQueue = new ArrayDeque<>();
@@ -95,11 +95,12 @@ public class DAGBuilder {
 		for (String s : queryParts) {
 			// Projektionspayload initialisieren
 			if (s.startsWith("SELECT")) {
-				setProjectionAndAggregationPayload(s);
+				setProjectionPayload(s.substring(7));
+				setAggregationPayload(s.substring(7));
 			}
 			// Erste DataSource initialisieren
 			if (s.startsWith("FROM")) {
-				setTablePayload(s);
+				setTablePayload(s.substring(5));
 			}
 			// Weitere DataSources pro JOINs initialisieren
 			if (s.startsWith("JOIN")) {
@@ -107,7 +108,7 @@ public class DAGBuilder {
 			}
 			// Selektionspayload initialisieren
 			if (s.startsWith("WHERE")) {
-				setSelectionPayload(s);
+				setSelectionPayload(s.substring(6));
 			}
 			// GroupByPayload initialisieren
 			if (s.startsWith("GROUP BY")) {
@@ -215,9 +216,9 @@ public class DAGBuilder {
 
 		// Zu joinende Knoten holen
 		Vertex vertexToJoin = relationVertexMap.get(relationToJoin);
-		Vertex existingHashJoinVertex = vertexQueue.getLast();
+		Vertex existingJoinVertex = vertexQueue.getLast();
 		String relationVertexName = vertexToJoin.getName();
-		String hashJoinVertexName = existingHashJoinVertex.getName();
+		String hashJoinVertexName = existingJoinVertex.getName();
 
 		// UserPayload mit Joinparametern initialisieren
 		Configuration conf = new Configuration();
@@ -239,7 +240,7 @@ public class DAGBuilder {
 		// gejoined werden sollen
 		UnorderedKVEdgeConfig eConfig = UnorderedKVEdgeConfig
 				.newBuilder(NullWritable.class.getName(), Tuple.class.getName()).setFromConfiguration(tezConf).build();
-		Edge e1 = Edge.create(existingHashJoinVertex, newHashJoinVertex, eConfig.createDefaultOneToOneEdgeProperty());
+		Edge e1 = Edge.create(existingJoinVertex, newHashJoinVertex, eConfig.createDefaultOneToOneEdgeProperty());
 		Edge e2 = Edge.create(vertexToJoin, newHashJoinVertex, eConfig.createDefaultOneToOneEdgeProperty());
 
 		// Vertex und zwei Edges in die jeweiligen Queues stecken
@@ -279,13 +280,11 @@ public class DAGBuilder {
 		edgeQueue.add(e1);
 
 		// Aggregationsvertex erzeugen und mit GroupBy-Knoten verbinden
-		Configuration conf = new Configuration();
-		conf.set("AggregateFunctions", "count(artikel.preis)");
-		UserPayload up = TezUtils.createUserPayloadFromConf(conf);
-
 		Vertex aggregateVertex = Vertex.create("v" + ++vertexCount,
-				ProcessorDescriptor.create(AggregationProcessor.class.getName()).setUserPayload(up), 1);
+				ProcessorDescriptor.create(AggregationProcessor.class.getName()).setUserPayload(aggregationParameter),
+				1);
 		vertexQueue.add(aggregateVertex);
+
 		OrderedPartitionedKVEdgeConfig eConfig2 = OrderedPartitionedKVEdgeConfig
 				.newBuilder(Text.class.getName(), Tuple.class.getName(), HashPartitioner.class.getName()).build();
 		Edge e2 = Edge.create(groupByVertex, aggregateVertex, eConfig2.createDefaultEdgeProperty());
@@ -296,8 +295,6 @@ public class DAGBuilder {
 		// Projektionsknoten erzeugen, speichern und mit DataSinks verknüpfen
 		Vertex v = Vertex.create("v" + ++vertexCount,
 				ProcessorDescriptor.create(ProjectionProcessor.class.getName()).setUserPayload(projectionParameter));
-		// v.addDataSink("OutputTable", outputTable);
-		// v.addDataSink("OutputScheme", outputScheme);
 		Vertex vertexToConnect = vertexQueue.getLast();
 		vertexQueue.add(v);
 
@@ -310,15 +307,12 @@ public class DAGBuilder {
 	}
 
 	private void initializeOutputVertex(TezConfiguration tezConf) {
-
 		// Zwei DataSinks erzeugen (1x für Ergebnisdaten und 1x für das
 		// Ergebnisschema)
 		DataSinkDescriptor outputTable = MROutput
-				.createConfigBuilder(new Configuration(tezConf), TextOutputFormat.class, "./tables/output_table")
-				.build();
+				.createConfigBuilder(new Configuration(tezConf), TextOutputFormat.class, "./output_table").build();
 		DataSinkDescriptor outputScheme = MROutput
-				.createConfigBuilder(new Configuration(tezConf), TextOutputFormat.class, "./tables/output_scheme")
-				.build();
+				.createConfigBuilder(new Configuration(tezConf), TextOutputFormat.class, "./output_scheme").build();
 
 		// Projektionsknoten erzeugen, speichern und mit DataSinks verknüpfen
 		Vertex v = Vertex.create("v" + ++vertexCount, ProcessorDescriptor.create(OutputProcessor.class.getName()));
@@ -335,52 +329,45 @@ public class DAGBuilder {
 		edgeQueue.add(e);
 	}
 
-	private void setProjectionAndAggregationPayload(String queryPart) throws IOException {
-		System.out.println("---- setProjectionAndAggregationConfiguration ----");
-		// SELECT-wort abschneiden
-		String projectionString = queryPart.substring(7);
-		System.out.println(projectionString);
+	private void setProjectionPayload(String queryPart) throws IOException {
 		// Muss projeziert werden?
-		if (!projectionString.trim().contains("*")) {
+		if (!queryPart.trim().contains("*")) {
 			needProjection = true;
 			Configuration conf = new Configuration();
-			conf.set("Projection", projectionString);
+			conf.set("Projection", queryPart);
 			this.projectionParameter = TezUtils.createUserPayloadFromConf(conf);
 		}
-		// System.out.println("Projektion benötigt? " + needProjection);
+	}
 
+	private void setAggregationPayload(String queryPart) throws IOException {
+		// Aggregatfunktionen in Configuration speichern, falls vorhanden
+		List<String> queryParts = Lists
+				.newArrayList(Splitter.on(",").trimResults().omitEmptyStrings().split(queryPart));
+		// Aggregatfunktionen im SELECT-Statement erkennt man an einer öffnenden
+		// Klammer!
+		StringBuilder sb = new StringBuilder();
+		for (int i = 0; i < queryParts.size(); i++) {
+			if (queryParts.get(i).contains("(")) {
+				sb.append(queryParts.get(i));
+				sb.append(", ");
+			}
+		}
+		Configuration conf = new Configuration();
+		conf.set("AggregateFunctions", sb.toString());
+		this.aggregationParameter = TezUtils.createUserPayloadFromConf(conf);
 	}
 
 	private void setTablePayload(String queryPart) throws IOException {
-		// System.out.println("---- setTableConfiguration ----");
-		List<String> queryParts = Lists
-				.newArrayList(Splitter.on(' ').trimResults().omitEmptyStrings().split(queryPart));
-		// for (String s : queryParts) {
-		// System.out.print(s + " ");
-		// }
-		// System.out.println();
 		// Name der Source-Relation speichern
-		this.dataSourceQueue.add(queryParts.get(1));
-		// Muss eine Relation umbenannt werden?
-		Configuration conf = new Configuration();
-		if (queryParts.size() == 3) {
-			// queryPart hat folgende Form: FROM <table> <newTableName>
-			conf.set("NewRelationRename", queryParts.get(2));
-		} else {
-			// queryPart hat folgende Form: FROM <table>
-			// => Keine Umbennenung nötig
-			conf.set("NewRelationRename", "");
-		}
-		this.tableParameter = TezUtils.createUserPayloadFromConf(conf);
+		this.dataSourceQueue.add(queryPart);
+
+		// ToDo: Eventuelle Payload für TableProcessor hier erzeugen!
 	}
 
 	private void setSelectionPayload(String queryPart) throws IOException {
-		// System.out.println("---- setSelectionConfiguration ----");
-		// WHERE-wort abschneiden
-		String selectionString = queryPart.substring(6);
 		// System.out.println(selectionString);
 		Configuration conf = new Configuration();
-		conf.set("SelectionPredicate", selectionString);
+		conf.set("SelectionPredicate", queryPart);
 		this.selectionParameter = TezUtils.createUserPayloadFromConf(conf);
 		needSelection = true; // flag setzen, um später einen Selection-Vertex
 								// zu erzeugen
@@ -396,7 +383,6 @@ public class DAGBuilder {
 
 	private void prepareJoinInformation(String queryPart) throws IOException {
 		// System.out.println("---- setJoinConfiguration ----");
-		// System.out.println(queryPart);
 		List<String> queryParts = Lists
 				.newArrayList(Splitter.on(' ').trimResults().omitEmptyStrings().limit(3).split(queryPart));
 		// for (String s : queryParts) {
@@ -410,24 +396,5 @@ public class DAGBuilder {
 		// System.out.println(
 		// "Zu joinende Relation: " + queryParts.get(0) + " mit folgendem
 		// Joinattribut: " + queryParts.get(2));
-	}
-
-	private void aggregate() {
-		// AggregationConfiguration
-		//
-		List<String> queryParts02 = Lists.newArrayList(Splitter.on(CharMatcher.anyOf(" ").or(CharMatcher.anyOf(", ")))
-				.trimResults().omitEmptyStrings().split("queryPart"));
-		// Aggregatfunktionen im SELECT-Statement erkennt man an einer öffnenden
-		// Klammer!
-		StringBuilder sb = new StringBuilder();
-		for (int i = 1; i < queryParts02.size(); i++) {
-			if (queryParts02.get(i).contains("(")) {
-				sb.append(queryParts02.get(i));
-				sb.append(", ");
-			}
-		}
-		sb.delete(sb.length() - 2, sb.length());
-		System.out.println(sb.toString());
-		// this.aggregationParameter.set("AggregateFunctions", sb.toString());
 	}
 }

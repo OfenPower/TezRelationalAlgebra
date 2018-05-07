@@ -49,7 +49,8 @@ public class GroupByProcessor extends SimpleProcessor {
 				sb.append(tupleColumnStringMap.get(attribute) + ";");
 			}
 			Text key = new Text(sb.toString());
-			System.out.println("GroupBy key: " + key.toString());
+			// DEBUG: Gebauten Gruppierungskey anzeigen!
+			// System.out.println("GroupBy key: " + key.toString());
 			kvWriter.write(key, tuple);
 		}
 	}

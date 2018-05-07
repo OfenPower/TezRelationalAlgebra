@@ -13,4 +13,6 @@
 <fullyQualifiedTypeName name="org.apache.tez.runtime.library.conf.OrderedPartitionedKVEdgeConfig"/>
 <fullyQualifiedTypeName name="org.apache.tez.runtime.library.partitioner.HashPartitioner"/>
 <fullyQualifiedTypeName name="org.apache.hadoop.io.NullWritable"/>
+<fullyQualifiedTypeName name="de.bachd.bigdata.tez.OutputProcessor"/>
+<fullyQualifiedTypeName name="de.bachd.bigdata.tez.SchemeProcessor"/>
 </qualifiedTypeNameHistroy>
